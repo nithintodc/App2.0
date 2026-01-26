@@ -139,6 +139,8 @@ def load_and_aggregate_dd_data(excluded_dates=None, pre_start_date=None, pre_end
     # Debug: Show file info
     st.info(f"🔍 DEBUG: Loading DoorDash data from: {dd_data_path}")
     st.info(f"🔍 DEBUG: File exists: {dd_data_path.exists()}")
+    st.info(f"🔍 DEBUG: File absolute path: {dd_data_path.resolve()}")
+    st.info(f"🔍 DEBUG: File size: {dd_data_path.stat().st_size / 1024 / 1024:.2f} MB" if dd_data_path.exists() else "File not found")
     
     # Use master file dd-data.csv
     # For LastYear_Pre_vs_Post: pre24 = last year's pre dates, post24 = last year's post dates

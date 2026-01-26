@@ -241,9 +241,50 @@ def main():
     post_end = post_end_date if post_end_date else None
     
     # Get uploaded file paths (use uploaded files if available, otherwise fall back to config paths)
-    dd_data_path = st.session_state.get("uploaded_dd_data", DD_DATA_MASTER)
-    ue_data_path = st.session_state.get("uploaded_ue_data", UE_DATA_MASTER)
-    marketing_folder_path = st.session_state.get("uploaded_marketing_folder", ROOT_DIR)
+    # Also check root folder for files if not uploaded
+    from pathlib import Path
+    
+    dd_data_path = st.session_state.get("uploaded_dd_data")
+    if dd_data_path is None:
+        # Check if dd-data.csv exists in root
+        if DD_DATA_MASTER.exists():
+            dd_data_path = DD_DATA_MASTER
+        else:
+            # Try to find any CSV file that might be DoorDash data in root folder
+            root_csvs = list(ROOT_DIR.glob("*.csv"))
+            # Look for files that might be DoorDash (contain "FINANCIAL" or "dd" or "doordash")
+            dd_candidates = [f for f in root_csvs if any(keyword in f.name.upper() for keyword in ['FINANCIAL', 'DD', 'DOORDASH'])]
+            if dd_candidates:
+                dd_data_path = dd_candidates[0]  # Use first match
+                st.info(f"📁 Auto-detected DoorDash file: {dd_data_path.name}")
+            else:
+                dd_data_path = DD_DATA_MASTER
+    
+    ue_data_path = st.session_state.get("uploaded_ue_data")
+    if ue_data_path is None:
+        # Check if ue-data.csv exists in root
+        if UE_DATA_MASTER.exists():
+            ue_data_path = UE_DATA_MASTER
+        else:
+            # Try to find any CSV file that might be UberEats data in root folder
+            root_csvs = list(ROOT_DIR.glob("*.csv"))
+            # Look for files that might be UberEats (contain "ue" or "ubereats")
+            ue_candidates = [f for f in root_csvs if any(keyword in f.name.upper() for keyword in ['UE', 'UBEREATS', 'ORDER'])]
+            if ue_candidates:
+                ue_data_path = ue_candidates[0]  # Use first match
+                st.info(f"📁 Auto-detected UberEats file: {ue_data_path.name}")
+            else:
+                ue_data_path = UE_DATA_MASTER
+    
+    marketing_folder_path = st.session_state.get("uploaded_marketing_folder")
+    if marketing_folder_path is None:
+        # Check if marketing folder exists in root
+        marketing_candidates = list(ROOT_DIR.glob("marketing*"))
+        if marketing_candidates and marketing_candidates[0].is_dir():
+            marketing_folder_path = marketing_candidates[0]
+            st.info(f"📁 Auto-detected marketing folder: {marketing_folder_path.name}")
+        else:
+            marketing_folder_path = ROOT_DIR
     
     # Load both platforms' data
     with st.spinner("Loading data for both platforms..."):

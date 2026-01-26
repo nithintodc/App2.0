@@ -154,13 +154,19 @@ def filter_master_file_by_date_range(file_path, start_date, end_date, date_col_n
         
         st.info(f"🔍 DEBUG: Found date column '{actual_date_col}' in {file_path.name}")
         
-        # Convert date column to datetime - try common formats first
+        # Convert date column to datetime - try multiple formats
+        # Try YYYY-MM-DD format first (common in exported files)
         try:
-            # Try MM/DD/YYYY format first (most common)
-            df[actual_date_col] = pd.to_datetime(df[actual_date_col], format='%m/%d/%Y', errors='coerce')
+            df[actual_date_col] = pd.to_datetime(df[actual_date_col], format='%Y-%m-%d', errors='coerce')
+            if df[actual_date_col].isna().all():
+                # If all failed, try MM/DD/YYYY format
+                df[actual_date_col] = pd.to_datetime(df[actual_date_col], format='%m/%d/%Y', errors='coerce')
         except:
             # Fall back to automatic parsing if format doesn't match
-            df[actual_date_col] = pd.to_datetime(df[actual_date_col], errors='coerce')
+            try:
+                df[actual_date_col] = pd.to_datetime(df[actual_date_col], format='%m/%d/%Y', errors='coerce')
+            except:
+                df[actual_date_col] = pd.to_datetime(df[actual_date_col], errors='coerce')
         
         # Show date range in file before filtering
         df_with_dates = df.dropna(subset=[actual_date_col])

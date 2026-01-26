@@ -3,7 +3,7 @@ import pandas as pd
 import streamlit as st
 from pathlib import Path
 from config import DD_DATA_MASTER, UE_DATA_MASTER, ROOT_DIR
-from utils import filter_master_file_by_date_range, normalize_store_id_column
+from utils import filter_master_file_by_date_range, normalize_store_id_column, find_date_column
 
 
 def process_master_file_for_dd(file_path, start_date, end_date, excluded_dates=None):
@@ -22,7 +22,16 @@ def process_master_file_for_dd(file_path, start_date, end_date, excluded_dates=N
     try:
         # Debug: Show file path and date range
         st.info(f"🔍 DEBUG: Processing DoorDash file: {file_path.name}")
+        st.info(f"🔍 DEBUG: File absolute path: {file_path.resolve()}")
         st.info(f"🔍 DEBUG: Date range: {start_date} to {end_date}")
+        
+        # Check if file exists and show size
+        if file_path.exists():
+            file_size_mb = file_path.stat().st_size / 1024 / 1024
+            st.info(f"🔍 DEBUG: File size: {file_size_mb:.2f} MB")
+        else:
+            st.error(f"❌ DEBUG: File does not exist at: {file_path.resolve()}")
+            return pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
         
         # Load and filter by date range using "Timestamp local date" column variations
         # Try multiple variations: "Timestamp local date", "Timestamp Local Date", "Date", etc.
@@ -39,7 +48,6 @@ def process_master_file_for_dd(file_path, start_date, end_date, excluded_dates=N
                 df_raw.columns = df_raw.columns.str.strip()
                 st.info(f"🔍 DEBUG: Raw file has {len(df_raw)} rows and columns: {list(df_raw.columns)[:10]}")
                 # Check if date column exists
-                from utils import find_date_column
                 found_col = find_date_column(df_raw, date_col_variations)
                 if found_col:
                     st.info(f"🔍 DEBUG: Found date column: '{found_col}'")
