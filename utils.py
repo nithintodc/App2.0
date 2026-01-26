@@ -148,8 +148,13 @@ def filter_master_file_by_date_range(file_path, start_date, end_date, date_col_n
             st.warning(f"Date column not found in {file_path.name}. Tried: {preferred_names}. Available columns: {list(df.columns)[:10]}")
             return pd.DataFrame()
         
-        # Convert date column to datetime
-        df[actual_date_col] = pd.to_datetime(df[actual_date_col], errors='coerce')
+        # Convert date column to datetime - try common formats first
+        try:
+            # Try MM/DD/YYYY format first (most common)
+            df[actual_date_col] = pd.to_datetime(df[actual_date_col], format='%m/%d/%Y', errors='coerce')
+        except:
+            # Fall back to automatic parsing if format doesn't match
+            df[actual_date_col] = pd.to_datetime(df[actual_date_col], errors='coerce')
         df = df.dropna(subset=[actual_date_col])
         
         # Parse start and end dates

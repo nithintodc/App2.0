@@ -500,7 +500,7 @@ def display_file_upload_screen():
     if not dates_provided:
         st.warning("⚠️ Please enter both Pre and Post date ranges before proceeding.")
     
-    if st.button("🚀 Start Analysis", type="primary", disabled=not (all_files_uploaded and dates_provided), use_container_width=True):
+    if st.button("🚀 Start Analysis", type="primary", disabled=not (all_files_uploaded and dates_provided), width='stretch'):
         # Validate and parse dates
         valid = True
         

@@ -203,14 +203,14 @@ def main():
         if current_screen == "upload":
             st.markdown("**📤 Upload Files** (Current)")
         else:
-            if st.button("📤 Upload Files", use_container_width=True, key="nav_upload"):
+            if st.button("📤 Upload Files", width='stretch', key="nav_upload"):
                 st.session_state["current_screen"] = "upload"
                 st.rerun()
         
         if current_screen == "dashboard":
             st.markdown("**📊 Dashboard** (Current)")
         else:
-            if st.button("📊 Dashboard", use_container_width=True, key="nav_dashboard"):
+            if st.button("📊 Dashboard", width='stretch', key="nav_dashboard"):
                 if st.session_state.get("uploaded_dd_data") and st.session_state.get("uploaded_ue_data"):
                     st.session_state["current_screen"] = "dashboard"
                     st.rerun()
@@ -527,11 +527,11 @@ def main():
     st.subheader("📥 Export Data")
     col1, col2, col3 = st.columns(3)
     with col1:
-        export_clicked = st.button("📊 Export All Tables to Excel", type="primary", use_container_width=True, key="export_excel")
+        export_clicked = st.button("📊 Export All Tables to Excel", type="primary", width='stretch', key="export_excel")
     with col2:
-        date_export_clicked = st.button("📅 Date Export", type="primary", use_container_width=True, key="export_date")
+        date_export_clicked = st.button("📅 Date Export", type="primary", width='stretch', key="export_date")
     with col3:
-        dataset_export_clicked = st.button("📦 Export Dataset", type="primary", use_container_width=True, key="export_dataset")
+        dataset_export_clicked = st.button("📦 Export Dataset", type="primary", width='stretch', key="export_dataset")
     
     st.divider()
     
@@ -587,7 +587,7 @@ def main():
                     file_name=filename,
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                     type="primary",
-                    use_container_width=True
+                    width='stretch'
                 )
         except Exception as e:
             st.error(f"❌ **Export failed!** Error: {str(e)}")
@@ -667,7 +667,7 @@ def main():
                 combined_store1_display['Growth%'] = combined_store1_display['Growth%'].apply(lambda x: f"{x:.1f}%" if isinstance(x, (int, float)) else x)
             if 'Store ID' in combined_store1_display.columns:
                 combined_store1_display = combined_store1_display.set_index('Store ID')
-            st.dataframe(combined_store1_display, use_container_width=True, height=400)
+            st.dataframe(combined_store1_display, width='stretch', height=400)
         else:
             st.info("No data available for Combined Table 1")
     
@@ -697,7 +697,7 @@ def main():
             
             if 'Store ID' in combined_store2_display.columns:
                 combined_store2_display = combined_store2_display.set_index('Store ID')
-            st.dataframe(combined_store2_display, use_container_width=True, height=400)
+            st.dataframe(combined_store2_display, width='stretch', height=400)
         else:
             st.info("No data available for Combined Table 2")
     
@@ -747,7 +747,7 @@ def main():
         combined_summary1_display[col] = combined_summary1_display[col].astype(str)
     
     st.write("**Combined Table 1: Current Year Pre vs Post Analysis**")
-    st.dataframe(combined_summary1_display, use_container_width=True)
+    st.dataframe(combined_summary1_display, width='stretch')
     
     # Format Table 2
     combined_summary2_display = combined_summary2.copy()
@@ -773,7 +773,7 @@ def main():
         combined_summary2_display[col] = combined_summary2_display[col].astype(str)
     
     st.write("**Combined Table 2: Year-over-Year Analysis**")
-    st.dataframe(combined_summary2_display, use_container_width=True)
+    st.dataframe(combined_summary2_display, width='stretch')
     
     st.divider()
     
@@ -814,7 +814,7 @@ def main():
         )
         corporate_display = corporate_display.set_index('Is Self Serve Campaign')
         
-        st.dataframe(corporate_display, use_container_width=True, height=200)
+        st.dataframe(corporate_display, width='stretch', height=200)
         
         # Show individual tables in expanders
         with st.expander("📊 Promotion Table Details", expanded=False):
@@ -831,7 +831,7 @@ def main():
                     lambda x: 'Corporate' if x == False else ('TODC' if x == True else str(x))
                 )
                 promo_display = promo_display.set_index('Is Self Serve Campaign')
-                st.dataframe(promo_display, use_container_width=True)
+                st.dataframe(promo_display, width='stretch')
             else:
                 st.info("No promotion data available")
         
@@ -849,7 +849,7 @@ def main():
                     lambda x: 'Corporate' if x == False else ('TODC' if x == True else str(x))
                 )
                 sponsored_display = sponsored_display.set_index('Is Self Serve Campaign')
-                st.dataframe(sponsored_display, use_container_width=True)
+                st.dataframe(sponsored_display, width='stretch')
             else:
                 st.info("No sponsored listing data available")
     else:

@@ -79,7 +79,7 @@ def display_store_tables(platform_name, table1_df, table2_df):
         table1_display['LastYear Pre vs Post'] = table1_display['LastYear Pre vs Post'].apply(lambda x: f"${x:,.1f}")
         table1_display['Growth%'] = table1_display['Growth%'].apply(lambda x: f"{x:.1f}%")
         table1_display = table1_display.set_index('Store ID')
-        st.dataframe(table1_display, use_container_width=True, height=400)
+        st.dataframe(table1_display, width='stretch', height=400)
     else:
         st.info("No data available for Table 1")
     
@@ -108,7 +108,7 @@ def display_store_tables(platform_name, table1_df, table2_df):
             
             if 'Store ID' in table2_display.columns:
                 table2_display = table2_display.set_index('Store ID')
-            st.dataframe(table2_display, use_container_width=True, height=400)
+            st.dataframe(table2_display, width='stretch', height=400)
         else:
             st.info("No data available for Table 2")
     else:
@@ -145,7 +145,7 @@ def display_summary_tables(platform_name, summary_table1, summary_table2):
     for col in summary_table1_display.columns:
         summary_table1_display[col] = summary_table1_display[col].astype(str)
     
-    st.dataframe(summary_table1_display, use_container_width=True)
+    st.dataframe(summary_table1_display, width='stretch')
     
     st.write(f"**{platform_name} Table 2: Year-over-Year Analysis**")
     summary_table2_display = summary_table2.copy()
@@ -173,7 +173,7 @@ def display_summary_tables(platform_name, summary_table1, summary_table2):
     for col in summary_table2_display.columns:
         summary_table2_display[col] = summary_table2_display[col].astype(str)
     
-    st.dataframe(summary_table2_display, use_container_width=True)
+    st.dataframe(summary_table2_display, width='stretch')
 
 
 def display_platform_data(platform_name, sales_df, payouts_df, sales_label, platform_key):
@@ -206,7 +206,7 @@ def display_platform_data(platform_name, sales_df, payouts_df, sales_label, plat
     summary_table1_display['Growth%'] = summary_table1_display['Growth%'].apply(lambda x: f"{x:.1f}%")
     
     st.write("**Table 1: Current Year Pre vs Post Analysis**")
-    st.dataframe(summary_table1_display, use_container_width=True)
+    st.dataframe(summary_table1_display, width='stretch')
     
     # Format and display Summary Table 2
     summary_table2_display = summary_table2.copy()
@@ -216,7 +216,7 @@ def display_platform_data(platform_name, sales_df, payouts_df, sales_label, plat
     summary_table2_display['YoY%'] = summary_table2_display['YoY%'].apply(lambda x: f"{x:.1f}%")
     
     st.write("**Table 2: Year-over-Year Analysis**")
-    st.dataframe(summary_table2_display, use_container_width=True)
+    st.dataframe(summary_table2_display, width='stretch')
     
     st.divider()
     st.subheader("🏪 Store-Level Analysis")
@@ -244,7 +244,7 @@ def display_platform_data(platform_name, sales_df, payouts_df, sales_label, plat
     table1_display = table1_display.set_index('Store ID')
     st.dataframe(
         table1_display,
-        use_container_width=True,
+        width='stretch',
         height=400
     )
     
@@ -269,7 +269,7 @@ def display_platform_data(platform_name, sales_df, payouts_df, sales_label, plat
     table2_display = table2_display.set_index('Store ID')
     st.dataframe(
         table2_display,
-        use_container_width=True,
+        width='stretch',
         height=400
     )
     

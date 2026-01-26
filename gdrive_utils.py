@@ -28,9 +28,18 @@ class GoogleDriveManager:
         credentials_info = None
         try:
             # Check if running on Streamlit Cloud with secrets
-            if hasattr(st, 'secrets') and 'gcp' in st.secrets and 'service_account' in st.secrets.gcp:
-                credentials_info = dict(st.secrets.gcp.service_account)
-                st.info("✅ Using credentials from Streamlit Cloud secrets")
+            if hasattr(st, 'secrets'):
+                try:
+                    # Try to access gcp_service_account directly (new format)
+                    if 'gcp_service_account' in st.secrets:
+                        credentials_info = dict(st.secrets['gcp_service_account'])
+                        st.info("✅ Using credentials from Streamlit Cloud secrets")
+                    # Fallback to nested structure (old format)
+                    elif hasattr(st.secrets, 'gcp') and hasattr(st.secrets.gcp, 'service_account'):
+                        credentials_info = dict(st.secrets.gcp.service_account)
+                        st.info("✅ Using credentials from Streamlit Cloud secrets")
+                except (KeyError, AttributeError):
+                    pass
         except Exception:
             pass
         
