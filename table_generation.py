@@ -27,6 +27,16 @@ def create_summary_tables(sales_df, payouts_df, orders_df, new_customers_df, sel
     else:
         # For DD: mkt files use different Store IDs than main files, so sum ALL new customers
         # Don't filter by selected stores - aggregate all from mkt files
+        st.info(f"🔍 DEBUG 10: In create_summary_tables - new_customers_df empty: {new_customers_df.empty}")
+        if not new_customers_df.empty:
+            st.info(f"🔍 DEBUG 10: new_customers_df columns: {list(new_customers_df.columns)}")
+            st.info(f"🔍 DEBUG 10: new_customers_df shape: {new_customers_df.shape}")
+            st.info(f"🔍 DEBUG 10: Required columns check: {all(col in new_customers_df.columns for col in ['pre_24', 'post_24', 'pre_25', 'post_25', 'PrevsPost', 'LastYear_Pre_vs_Post', 'YoY'])}")
+            if 'pre_25' in new_customers_df.columns:
+                st.info(f"🔍 DEBUG 10: pre_25 sum: {new_customers_df['pre_25'].sum()}")
+            if 'post_25' in new_customers_df.columns:
+                st.info(f"🔍 DEBUG 10: post_25 sum: {new_customers_df['post_25'].sum()}")
+        
         if not new_customers_df.empty and all(col in new_customers_df.columns for col in ['pre_24', 'post_24', 'pre_25', 'post_25', 'PrevsPost', 'LastYear_Pre_vs_Post', 'YoY']):
             new_customers_summary = {
                 'pre_25': new_customers_df['pre_25'].sum(),
@@ -38,11 +48,13 @@ def create_summary_tables(sales_df, payouts_df, orders_df, new_customers_df, sel
             }
             new_customers_summary['Growth%'] = (new_customers_summary['PrevsPost'] / new_customers_summary['pre_25'] * 100) if new_customers_summary['pre_25'] != 0 else 0
             new_customers_summary['YoY%'] = (new_customers_summary['YoY'] / new_customers_summary['post_24'] * 100) if new_customers_summary['post_24'] != 0 else 0
+            st.info(f"🔍 DEBUG 11: Calculated new_customers_summary: {new_customers_summary}")
         else:
             new_customers_summary = {
                 'pre_25': 0, 'post_25': 0, 'PrevsPost': 0, 'LastYear_Pre_vs_Post': 0,
                 'post_24': 0, 'YoY': 0, 'Growth%': 0, 'YoY%': 0
             }
+            st.warning(f"⚠️ DEBUG 11: Using zero values for new_customers_summary - DataFrame empty or missing columns")
     
     # Aggregate across all stores
     sales_summary = {

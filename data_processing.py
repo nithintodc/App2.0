@@ -730,10 +730,22 @@ def process_new_customers_data(pre_24_nc, post_24_nc, pre_25_nc, post_25_nc, is_
         return pd.DataFrame(columns=['Store ID', 'pre_24', 'post_24', 'pre_25', 'post_25', 'PrevsPost', 'LastYear_Pre_vs_Post', 'YoY'])
     
     # DD: Process New Customers data - handle empty dataframes
+    st.info(f"🔍 DEBUG 6: Processing new customers data - Pre 24 empty: {pre_24_nc.empty}, Post 24 empty: {post_24_nc.empty}, Pre 25 empty: {pre_25_nc.empty}, Post 25 empty: {post_25_nc.empty}")
+    
     pre_24_nc_renamed = pre_24_nc.rename(columns={'New Customers': 'pre_24'}) if (not pre_24_nc.empty and 'New Customers' in pre_24_nc.columns) else pd.DataFrame(columns=['Store ID', 'pre_24'])
     post_24_nc_renamed = post_24_nc.rename(columns={'New Customers': 'post_24'}) if (not post_24_nc.empty and 'New Customers' in post_24_nc.columns) else pd.DataFrame(columns=['Store ID', 'post_24'])
     pre_25_nc_renamed = pre_25_nc.rename(columns={'New Customers': 'pre_25'}) if (not pre_25_nc.empty and 'New Customers' in pre_25_nc.columns) else pd.DataFrame(columns=['Store ID', 'pre_25'])
     post_25_nc_renamed = post_25_nc.rename(columns={'New Customers': 'post_25'}) if (not post_25_nc.empty and 'New Customers' in post_25_nc.columns) else pd.DataFrame(columns=['Store ID', 'post_25'])
+    
+    # Debug: Show what we have before merging
+    if not pre_24_nc_renamed.empty:
+        st.info(f"🔍 DEBUG 7: Pre 24 - {len(pre_24_nc_renamed)} stores, total: {pre_24_nc_renamed['pre_24'].sum()}")
+    if not post_24_nc_renamed.empty:
+        st.info(f"🔍 DEBUG 7: Post 24 - {len(post_24_nc_renamed)} stores, total: {post_24_nc_renamed['post_24'].sum()}")
+    if not pre_25_nc_renamed.empty:
+        st.info(f"🔍 DEBUG 7: Pre 25 - {len(pre_25_nc_renamed)} stores, total: {pre_25_nc_renamed['pre_25'].sum()}")
+    if not post_25_nc_renamed.empty:
+        st.info(f"🔍 DEBUG 7: Post 25 - {len(post_25_nc_renamed)} stores, total: {post_25_nc_renamed['post_25'].sum()}")
     
     # Convert Store ID to string for consistent merging
     for df in [pre_24_nc_renamed, post_24_nc_renamed, pre_25_nc_renamed, post_25_nc_renamed]:
@@ -768,9 +780,17 @@ def process_new_customers_data(pre_24_nc, post_24_nc, pre_25_nc, post_25_nc, is_
         if col in nc_result.columns:
             nc_result[col] = pd.to_numeric(nc_result[col], errors='coerce').fillna(0)
     
+    # Debug: Show merged result
+    st.info(f"🔍 DEBUG 8: After merging - {len(nc_result)} stores in result")
+    st.info(f"   - Columns: {list(nc_result.columns)}")
+    st.info(f"   - Pre 24 sum: {nc_result['pre_24'].sum()}, Post 24 sum: {nc_result['post_24'].sum()}")
+    st.info(f"   - Pre 25 sum: {nc_result['pre_25'].sum()}, Post 25 sum: {nc_result['post_25'].sum()}")
+    
     # Calculate metrics - ensure numeric types
     nc_result['PrevsPost'] = pd.to_numeric(nc_result['post_25'], errors='coerce').fillna(0) - pd.to_numeric(nc_result['pre_25'], errors='coerce').fillna(0)
     nc_result['LastYear_Pre_vs_Post'] = pd.to_numeric(nc_result['post_24'], errors='coerce').fillna(0) - pd.to_numeric(nc_result['pre_24'], errors='coerce').fillna(0)
     nc_result['YoY'] = pd.to_numeric(nc_result['post_25'], errors='coerce').fillna(0) - pd.to_numeric(nc_result['post_24'], errors='coerce').fillna(0)
+    
+    st.info(f"🔍 DEBUG 9: Final calculated metrics - PrevsPost: {nc_result['PrevsPost'].sum()}, LastYear_Pre_vs_Post: {nc_result['LastYear_Pre_vs_Post'].sum()}, YoY: {nc_result['YoY'].sum()}")
     
     return nc_result
