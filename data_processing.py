@@ -527,6 +527,10 @@ def process_data(pre_24_sales, pre_24_payouts, pre_24_orders, post_24_sales, pos
     if not post_25_s.empty and 'post_25' not in sales_result.columns:
         sales_result = sales_result.merge(post_25_s, on='Store ID', how='outer')
     sales_result = sales_result.fillna(0)
+    # Ensure numeric columns are numeric type
+    for col in ['pre_24', 'post_24', 'pre_25', 'post_25']:
+        if col in sales_result.columns:
+            sales_result[col] = pd.to_numeric(sales_result[col], errors='coerce').fillna(0)
     
     # Process Payouts data
     pre_24_p = pre_24_payouts.rename(columns={'Payouts': 'pre_24'}) if not pre_24_payouts.empty else pd.DataFrame(columns=['Store ID', 'pre_24'])
@@ -561,6 +565,10 @@ def process_data(pre_24_sales, pre_24_payouts, pre_24_orders, post_24_sales, pos
     if not post_25_p.empty and 'post_25' not in payouts_result.columns:
         payouts_result = payouts_result.merge(post_25_p, on='Store ID', how='outer')
     payouts_result = payouts_result.fillna(0)
+    # Ensure numeric columns are numeric type
+    for col in ['pre_24', 'post_24', 'pre_25', 'post_25']:
+        if col in payouts_result.columns:
+            payouts_result[col] = pd.to_numeric(payouts_result[col], errors='coerce').fillna(0)
     
     # Process Orders data
     pre_24_o = pre_24_orders.rename(columns={'Orders': 'pre_24'}) if not pre_24_orders.empty else pd.DataFrame(columns=['Store ID', 'pre_24'])
@@ -595,44 +603,63 @@ def process_data(pre_24_sales, pre_24_payouts, pre_24_orders, post_24_sales, pos
     if not post_25_o.empty and 'post_25' not in orders_result.columns:
         orders_result = orders_result.merge(post_25_o, on='Store ID', how='outer')
     orders_result = orders_result.fillna(0)
+    # Ensure numeric columns are numeric type
+    for col in ['pre_24', 'post_24', 'pre_25', 'post_25']:
+        if col in orders_result.columns:
+            orders_result[col] = pd.to_numeric(orders_result[col], errors='coerce').fillna(0)
     
-    # Ensure all required columns exist for calculations
+    # Ensure all required columns exist for calculations and are numeric
     required_cols = ['pre_24', 'post_24', 'pre_25', 'post_25']
     for col in required_cols:
         if col not in sales_result.columns:
-            sales_result[col] = 0
+            sales_result[col] = 0.0
+        else:
+            sales_result[col] = pd.to_numeric(sales_result[col], errors='coerce').fillna(0.0)
         if col not in payouts_result.columns:
-            payouts_result[col] = 0
+            payouts_result[col] = 0.0
+        else:
+            payouts_result[col] = pd.to_numeric(payouts_result[col], errors='coerce').fillna(0.0)
         if col not in orders_result.columns:
-            orders_result[col] = 0
+            orders_result[col] = 0.0
+        else:
+            orders_result[col] = pd.to_numeric(orders_result[col], errors='coerce').fillna(0.0)
     
-    # Calculate metrics for Sales
-    sales_result['PrevsPost'] = sales_result['post_25'] - sales_result['pre_25']
-    sales_result['LastYear_Pre_vs_Post'] = sales_result['post_24'] - sales_result['pre_24']
-    sales_result['YoY'] = sales_result['post_25'] - sales_result['post_24']
-    sales_result['Growth%'] = (sales_result['PrevsPost'] / sales_result['pre_25'] * 100).replace([float('inf'), -float('inf')], 0).fillna(0)
-    sales_result['YoY%'] = (sales_result['YoY'] / sales_result['post_24'] * 100).replace([float('inf'), -float('inf')], 0).fillna(0)
+    # Calculate metrics for Sales - ensure numeric types
+    sales_result['PrevsPost'] = pd.to_numeric(sales_result['post_25'], errors='coerce').fillna(0) - pd.to_numeric(sales_result['pre_25'], errors='coerce').fillna(0)
+    sales_result['LastYear_Pre_vs_Post'] = pd.to_numeric(sales_result['post_24'], errors='coerce').fillna(0) - pd.to_numeric(sales_result['pre_24'], errors='coerce').fillna(0)
+    sales_result['YoY'] = pd.to_numeric(sales_result['post_25'], errors='coerce').fillna(0) - pd.to_numeric(sales_result['post_24'], errors='coerce').fillna(0)
+    pre_25_numeric = pd.to_numeric(sales_result['pre_25'], errors='coerce').fillna(0)
+    post_24_numeric = pd.to_numeric(sales_result['post_24'], errors='coerce').fillna(0)
+    sales_result['Growth%'] = (sales_result['PrevsPost'] / pre_25_numeric.replace(0, 1) * 100).replace([float('inf'), -float('inf')], 0).fillna(0)
+    sales_result['YoY%'] = (sales_result['YoY'] / post_24_numeric.replace(0, 1) * 100).replace([float('inf'), -float('inf')], 0).fillna(0)
     
-    # Calculate metrics for Payouts
-    payouts_result['PrevsPost'] = payouts_result['post_25'] - payouts_result['pre_25']
-    payouts_result['LastYear_Pre_vs_Post'] = payouts_result['post_24'] - payouts_result['pre_24']
-    payouts_result['YoY'] = payouts_result['post_25'] - payouts_result['post_24']
-    payouts_result['Growth%'] = (payouts_result['PrevsPost'] / payouts_result['pre_25'] * 100).replace([float('inf'), -float('inf')], 0).fillna(0)
-    payouts_result['YoY%'] = (payouts_result['YoY'] / payouts_result['post_24'] * 100).replace([float('inf'), -float('inf')], 0).fillna(0)
+    # Calculate metrics for Payouts - ensure numeric types
+    payouts_result['PrevsPost'] = pd.to_numeric(payouts_result['post_25'], errors='coerce').fillna(0) - pd.to_numeric(payouts_result['pre_25'], errors='coerce').fillna(0)
+    payouts_result['LastYear_Pre_vs_Post'] = pd.to_numeric(payouts_result['post_24'], errors='coerce').fillna(0) - pd.to_numeric(payouts_result['pre_24'], errors='coerce').fillna(0)
+    payouts_result['YoY'] = pd.to_numeric(payouts_result['post_25'], errors='coerce').fillna(0) - pd.to_numeric(payouts_result['post_24'], errors='coerce').fillna(0)
+    pre_25_payouts_numeric = pd.to_numeric(payouts_result['pre_25'], errors='coerce').fillna(0)
+    post_24_payouts_numeric = pd.to_numeric(payouts_result['post_24'], errors='coerce').fillna(0)
+    payouts_result['Growth%'] = (payouts_result['PrevsPost'] / pre_25_payouts_numeric.replace(0, 1) * 100).replace([float('inf'), -float('inf')], 0).fillna(0)
+    payouts_result['YoY%'] = (payouts_result['YoY'] / post_24_payouts_numeric.replace(0, 1) * 100).replace([float('inf'), -float('inf')], 0).fillna(0)
     
-    # Calculate metrics for Orders
-    orders_result['PrevsPost'] = orders_result['post_25'] - orders_result['pre_25']
-    orders_result['LastYear_Pre_vs_Post'] = orders_result['post_24'] - orders_result['pre_24']
-    orders_result['YoY'] = orders_result['post_25'] - orders_result['post_24']
-    orders_result['Growth%'] = (orders_result['PrevsPost'] / orders_result['pre_25'] * 100).replace([float('inf'), -float('inf')], 0).fillna(0)
-    orders_result['YoY%'] = (orders_result['YoY'] / orders_result['post_24'] * 100).replace([float('inf'), -float('inf')], 0).fillna(0)
+    # Calculate metrics for Orders - ensure numeric types
+    orders_result['PrevsPost'] = pd.to_numeric(orders_result['post_25'], errors='coerce').fillna(0) - pd.to_numeric(orders_result['pre_25'], errors='coerce').fillna(0)
+    orders_result['LastYear_Pre_vs_Post'] = pd.to_numeric(orders_result['post_24'], errors='coerce').fillna(0) - pd.to_numeric(orders_result['pre_24'], errors='coerce').fillna(0)
+    orders_result['YoY'] = pd.to_numeric(orders_result['post_25'], errors='coerce').fillna(0) - pd.to_numeric(orders_result['post_24'], errors='coerce').fillna(0)
+    pre_25_orders_numeric = pd.to_numeric(orders_result['pre_25'], errors='coerce').fillna(0)
+    post_24_orders_numeric = pd.to_numeric(orders_result['post_24'], errors='coerce').fillna(0)
+    orders_result['Growth%'] = (orders_result['PrevsPost'] / pre_25_orders_numeric.replace(0, 1) * 100).replace([float('inf'), -float('inf')], 0).fillna(0)
+    orders_result['YoY%'] = (orders_result['YoY'] / post_24_orders_numeric.replace(0, 1) * 100).replace([float('inf'), -float('inf')], 0).fillna(0)
     
-    # Round numeric columns to 1 decimal place
+    # Round numeric columns to 1 decimal place - ensure they're numeric first
     numeric_cols = ['pre_24', 'post_24', 'pre_25', 'post_25', 'PrevsPost', 'LastYear_Pre_vs_Post', 'YoY', 'Growth%', 'YoY%']
     for col in numeric_cols:
-        sales_result[col] = sales_result[col].round(1)
-        payouts_result[col] = payouts_result[col].round(1)
-        orders_result[col] = orders_result[col].round(1)
+        if col in sales_result.columns:
+            sales_result[col] = pd.to_numeric(sales_result[col], errors='coerce').fillna(0).round(1)
+        if col in payouts_result.columns:
+            payouts_result[col] = pd.to_numeric(payouts_result[col], errors='coerce').fillna(0).round(1)
+        if col in orders_result.columns:
+            orders_result[col] = pd.to_numeric(orders_result[col], errors='coerce').fillna(0).round(1)
     
     return sales_result, payouts_result, orders_result
 
@@ -684,9 +711,14 @@ def process_new_customers_data(pre_24_nc, post_24_nc, pre_25_nc, post_25_nc, is_
     
     nc_result = nc_result.fillna(0)
     
-    # Calculate metrics
-    nc_result['PrevsPost'] = nc_result['post_25'] - nc_result['pre_25']
-    nc_result['LastYear_Pre_vs_Post'] = nc_result['post_24'] - nc_result['pre_24']
-    nc_result['YoY'] = nc_result['post_25'] - nc_result['post_24']
+    # Ensure numeric columns are numeric type before calculations
+    for col in ['pre_24', 'post_24', 'pre_25', 'post_25']:
+        if col in nc_result.columns:
+            nc_result[col] = pd.to_numeric(nc_result[col], errors='coerce').fillna(0)
+    
+    # Calculate metrics - ensure numeric types
+    nc_result['PrevsPost'] = pd.to_numeric(nc_result['post_25'], errors='coerce').fillna(0) - pd.to_numeric(nc_result['pre_25'], errors='coerce').fillna(0)
+    nc_result['LastYear_Pre_vs_Post'] = pd.to_numeric(nc_result['post_24'], errors='coerce').fillna(0) - pd.to_numeric(nc_result['pre_24'], errors='coerce').fillna(0)
+    nc_result['YoY'] = pd.to_numeric(nc_result['post_25'], errors='coerce').fillna(0) - pd.to_numeric(nc_result['post_24'], errors='coerce').fillna(0)
     
     return nc_result
