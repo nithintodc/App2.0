@@ -425,13 +425,36 @@ def main():
         
         st.header("🔍 Store Selection")
         
+        # Check if files are uploaded and exist
+        from pathlib import Path
+        dd_file_path = st.session_state.get("uploaded_dd_data")
+        ue_file_path = st.session_state.get("uploaded_ue_data")
+        
+        # Handle both Path objects and strings
+        if dd_file_path:
+            dd_file_path = Path(dd_file_path) if not isinstance(dd_file_path, Path) else dd_file_path
+            dd_file_uploaded = dd_file_path.exists()
+        else:
+            dd_file_uploaded = False
+            
+        if ue_file_path:
+            ue_file_path = Path(ue_file_path) if not isinstance(ue_file_path, Path) else ue_file_path
+            ue_file_uploaded = ue_file_path.exists()
+        else:
+            ue_file_uploaded = False
+        
+        # Also check if date ranges are set
+        date_ranges_set = bool(pre_start_date and pre_end_date and post_start_date and post_end_date)
+        
         # DoorDash store selection
-        create_store_selector("DoorDash", dd_sales_df, "selected_stores_DoorDash")
+        create_store_selector("DoorDash", dd_sales_df, "selected_stores_DoorDash", 
+                             file_uploaded=dd_file_uploaded, date_ranges_set=date_ranges_set)
         
         st.divider()
         
         # UberEats store selection
-        create_store_selector("UberEats", ue_sales_df, "selected_stores_UberEats")
+        create_store_selector("UberEats", ue_sales_df, "selected_stores_UberEats", 
+                             file_uploaded=ue_file_uploaded, date_ranges_set=date_ranges_set)
     
     st.divider()
     

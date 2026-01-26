@@ -4,12 +4,25 @@ import streamlit as st
 from table_generation import create_summary_tables
 
 
-def create_store_selector(platform_name, df, platform_key):
-    """Create store selection UI for a platform"""
+def create_store_selector(platform_name, df, platform_key, file_uploaded=False, date_ranges_set=False):
+    """Create store selection UI for a platform
+    
+    Args:
+        platform_name: Name of the platform (e.g., "DoorDash", "UberEats")
+        df: DataFrame with store data
+        platform_key: Session state key for storing selected stores
+        file_uploaded: Whether the file has been uploaded (default: False)
+        date_ranges_set: Whether date ranges have been set (default: False)
+    """
     with st.expander(f"🔍 {platform_name} Store Selection", expanded=True):
         # Check if dataframe is empty
         if df.empty:
-            st.warning(f"⚠️ No {platform_name} data available. Please set Pre and Post date ranges in the sidebar to load stores.")
+            if file_uploaded and not date_ranges_set:
+                st.warning(f"⚠️ {platform_name} file uploaded. Please set Pre and Post date ranges in the sidebar to load stores.")
+            elif file_uploaded and date_ranges_set:
+                st.warning(f"⚠️ {platform_name} file uploaded, but no data found for the selected date ranges. Please check your date ranges and try again.")
+            else:
+                st.warning(f"⚠️ No {platform_name} data available. Please upload the {platform_name} file and set Pre and Post date ranges in the sidebar.")
             st.info(f"**0** stores selected out of **0** total")
             return
         
