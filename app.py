@@ -324,14 +324,6 @@ def main():
             post_end_date=post_end,
             marketing_folder_path=marketing_folder_path
         )
-        
-        # Debug: Show what was received
-        st.info(f"🔍 DEBUG 13: After load_and_aggregate_new_customers in app.py:")
-        st.info(f"   - dd_pre_24_nc empty: {dd_pre_24_nc.empty}, rows: {len(dd_pre_24_nc)}")
-        st.info(f"   - dd_post_24_nc empty: {dd_post_24_nc.empty}, rows: {len(dd_post_24_nc)}")
-        st.info(f"   - dd_pre_25_nc empty: {dd_pre_25_nc.empty}, rows: {len(dd_pre_25_nc)}")
-        st.info(f"   - dd_post_25_nc empty: {dd_post_25_nc.empty}, rows: {len(dd_post_25_nc)}")
-        
         dd_new_customers_df = process_new_customers_data(dd_pre_24_nc, dd_post_24_nc, dd_pre_25_nc, dd_post_25_nc, is_ue=False)
         # For UE, we'll handle platform totals in create_summary_tables
         ue_new_customers_df = pd.DataFrame(columns=['Store ID', 'pre_24', 'post_24', 'pre_25', 'post_25', 'PrevsPost', 'LastYear_Pre_vs_Post', 'YoY'])

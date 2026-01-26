@@ -230,11 +230,6 @@ def load_and_aggregate_new_customers(excluded_dates=None, pre_start_date=None, p
             st.warning(f"⚠️ No MARKETING_PROMOTION*.csv files found in {marketing_folder_path}. Cannot load new customers data.")
             return pd.DataFrame()
         
-        # Debug: Show found files
-        st.info(f"✅ DEBUG 1: Found {len(promotion_files)} MARKETING_PROMOTION*.csv file(s):")
-        for pf in promotion_files:
-            st.info(f"   - {pf.name}")
-        
         # Process all MARKETING_PROMOTION*.csv files
         for promotion_file in promotion_files:
                 try:
@@ -256,14 +251,6 @@ def load_and_aggregate_new_customers(excluded_dates=None, pre_start_date=None, p
                     if new_customers_col is None:
                         st.warning(f"⚠️ 'New customers acquired' column not found in {promotion_file.name}. Available columns: {list(df.columns)[:10]}")
                         continue
-                    
-                    # Debug: Show column found and sample values
-                    st.info(f"✅ DEBUG 2: 'New customers acquired' column found in {promotion_file.name} (column name: '{new_customers_col}')")
-                    sample_values = df[new_customers_col].head(10).tolist()
-                    st.info(f"✅ DEBUG 3: Sample values (first 10 rows): {sample_values}")
-                    st.info(f"   - Total rows in file: {len(df)}")
-                    st.info(f"   - Sum of 'New customers acquired': {df[new_customers_col].sum()}")
-                    st.info(f"   - Non-zero values: {(df[new_customers_col] != 0).sum()}")
                     
                     # Normalize store ID column
                     df, store_col = normalize_store_id_column(df)
@@ -298,16 +285,8 @@ def load_and_aggregate_new_customers(excluded_dates=None, pre_start_date=None, p
                         else:
                             end_dt = pd.to_datetime(end_date)
                         
-                        st.info(f"🔍 DEBUG 4: Filtering for date range: {start_dt.date()} to {end_dt.date()}")
-                        st.info(f"   - Rows before date filtering: {len(df)}")
-                        st.info(f"   - Date range in file: {df['Date'].min().date()} to {df['Date'].max().date()}")
-                        
                         date_mask = (df['Date'] >= start_dt) & (df['Date'] <= end_dt)
                         df = df[date_mask]
-                        
-                        st.info(f"   - Rows after date filtering: {len(df)}")
-                        if len(df) > 0:
-                            st.info(f"   - Sum of 'New customers acquired' after filtering: {df[new_customers_col].sum()}")
                     
                     # Apply excluded dates filter
                     if excluded_dates and not df.empty:
@@ -359,14 +338,6 @@ def load_and_aggregate_new_customers(excluded_dates=None, pre_start_date=None, p
         
         # Convert Store ID to string to match other dataframes
         new_customers_agg['Store ID'] = new_customers_agg['Store ID'].astype(str)
-        
-        # Debug: Show final aggregation results
-        total_aggregated = new_customers_agg['New Customers'].sum()
-        st.info(f"🔍 DEBUG 5: Final aggregation for date range {start_date} to {end_date}:")
-        st.info(f"   - Total new customers aggregated: {total_aggregated}")
-        st.info(f"   - Number of stores: {len(new_customers_agg)}")
-        if len(new_customers_agg) > 0:
-            st.info(f"   - Sample store results (first 5): {new_customers_agg.head().to_dict('records')}")
         
         return new_customers_agg
     
@@ -531,13 +502,6 @@ def load_and_aggregate_new_customers(excluded_dates=None, pre_start_date=None, p
     ue_post_24_total = get_ue_platform_total(UE_MKT_POST_24, excluded_dates)
     ue_pre_25_total = get_ue_platform_total(UE_MKT_PRE_25, excluded_dates)
     ue_post_25_total = get_ue_platform_total(UE_MKT_POST_25, excluded_dates)
-    
-    # Debug: Show what's being returned
-    st.info(f"🔍 DEBUG 12: Before return from load_and_aggregate_new_customers:")
-    st.info(f"   - dd_pre_24_nc empty: {dd_pre_24_nc.empty}, rows: {len(dd_pre_24_nc)}, sum: {dd_pre_24_nc['New Customers'].sum() if not dd_pre_24_nc.empty and 'New Customers' in dd_pre_24_nc.columns else 0}")
-    st.info(f"   - dd_post_24_nc empty: {dd_post_24_nc.empty}, rows: {len(dd_post_24_nc)}, sum: {dd_post_24_nc['New Customers'].sum() if not dd_post_24_nc.empty and 'New Customers' in dd_post_24_nc.columns else 0}")
-    st.info(f"   - dd_pre_25_nc empty: {dd_pre_25_nc.empty}, rows: {len(dd_pre_25_nc)}, sum: {dd_pre_25_nc['New Customers'].sum() if not dd_pre_25_nc.empty and 'New Customers' in dd_pre_25_nc.columns else 0}")
-    st.info(f"   - dd_post_25_nc empty: {dd_post_25_nc.empty}, rows: {len(dd_post_25_nc)}, sum: {dd_post_25_nc['New Customers'].sum() if not dd_post_25_nc.empty and 'New Customers' in dd_post_25_nc.columns else 0}")
     
     # Return DD new customers DataFrames and UE totals as a tuple for platform-level aggregation
     return (dd_pre_24_nc, dd_post_24_nc, dd_pre_25_nc, dd_post_25_nc,
@@ -732,22 +696,10 @@ def process_new_customers_data(pre_24_nc, post_24_nc, pre_25_nc, post_25_nc, is_
         return pd.DataFrame(columns=['Store ID', 'pre_24', 'post_24', 'pre_25', 'post_25', 'PrevsPost', 'LastYear_Pre_vs_Post', 'YoY'])
     
     # DD: Process New Customers data - handle empty dataframes
-    st.info(f"🔍 DEBUG 6: Processing new customers data - Pre 24 empty: {pre_24_nc.empty}, Post 24 empty: {post_24_nc.empty}, Pre 25 empty: {pre_25_nc.empty}, Post 25 empty: {post_25_nc.empty}")
-    
     pre_24_nc_renamed = pre_24_nc.rename(columns={'New Customers': 'pre_24'}) if (not pre_24_nc.empty and 'New Customers' in pre_24_nc.columns) else pd.DataFrame(columns=['Store ID', 'pre_24'])
     post_24_nc_renamed = post_24_nc.rename(columns={'New Customers': 'post_24'}) if (not post_24_nc.empty and 'New Customers' in post_24_nc.columns) else pd.DataFrame(columns=['Store ID', 'post_24'])
     pre_25_nc_renamed = pre_25_nc.rename(columns={'New Customers': 'pre_25'}) if (not pre_25_nc.empty and 'New Customers' in pre_25_nc.columns) else pd.DataFrame(columns=['Store ID', 'pre_25'])
     post_25_nc_renamed = post_25_nc.rename(columns={'New Customers': 'post_25'}) if (not post_25_nc.empty and 'New Customers' in post_25_nc.columns) else pd.DataFrame(columns=['Store ID', 'post_25'])
-    
-    # Debug: Show what we have before merging
-    if not pre_24_nc_renamed.empty:
-        st.info(f"🔍 DEBUG 7: Pre 24 - {len(pre_24_nc_renamed)} stores, total: {pre_24_nc_renamed['pre_24'].sum()}")
-    if not post_24_nc_renamed.empty:
-        st.info(f"🔍 DEBUG 7: Post 24 - {len(post_24_nc_renamed)} stores, total: {post_24_nc_renamed['post_24'].sum()}")
-    if not pre_25_nc_renamed.empty:
-        st.info(f"🔍 DEBUG 7: Pre 25 - {len(pre_25_nc_renamed)} stores, total: {pre_25_nc_renamed['pre_25'].sum()}")
-    if not post_25_nc_renamed.empty:
-        st.info(f"🔍 DEBUG 7: Post 25 - {len(post_25_nc_renamed)} stores, total: {post_25_nc_renamed['post_25'].sum()}")
     
     # Convert Store ID to string for consistent merging
     for df in [pre_24_nc_renamed, post_24_nc_renamed, pre_25_nc_renamed, post_25_nc_renamed]:
@@ -782,17 +734,9 @@ def process_new_customers_data(pre_24_nc, post_24_nc, pre_25_nc, post_25_nc, is_
         if col in nc_result.columns:
             nc_result[col] = pd.to_numeric(nc_result[col], errors='coerce').fillna(0)
     
-    # Debug: Show merged result
-    st.info(f"🔍 DEBUG 8: After merging - {len(nc_result)} stores in result")
-    st.info(f"   - Columns: {list(nc_result.columns)}")
-    st.info(f"   - Pre 24 sum: {nc_result['pre_24'].sum()}, Post 24 sum: {nc_result['post_24'].sum()}")
-    st.info(f"   - Pre 25 sum: {nc_result['pre_25'].sum()}, Post 25 sum: {nc_result['post_25'].sum()}")
-    
     # Calculate metrics - ensure numeric types
     nc_result['PrevsPost'] = pd.to_numeric(nc_result['post_25'], errors='coerce').fillna(0) - pd.to_numeric(nc_result['pre_25'], errors='coerce').fillna(0)
     nc_result['LastYear_Pre_vs_Post'] = pd.to_numeric(nc_result['post_24'], errors='coerce').fillna(0) - pd.to_numeric(nc_result['pre_24'], errors='coerce').fillna(0)
     nc_result['YoY'] = pd.to_numeric(nc_result['post_25'], errors='coerce').fillna(0) - pd.to_numeric(nc_result['post_24'], errors='coerce').fillna(0)
-    
-    st.info(f"🔍 DEBUG 9: Final calculated metrics - PrevsPost: {nc_result['PrevsPost'].sum()}, LastYear_Pre_vs_Post: {nc_result['LastYear_Pre_vs_Post'].sum()}, YoY: {nc_result['YoY'].sum()}")
     
     return nc_result

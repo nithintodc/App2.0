@@ -26,7 +26,13 @@ def extract_file_info(file_path, file_type):
         Dictionary with file info: start_date, end_date, num_rows, columns
     """
     try:
-        df = pd.read_csv(file_path)
+        # UE files have headers in row 2 (0-indexed row 1), DD files have headers in row 1
+        if file_type == 'ue':
+            df = pd.read_csv(file_path, skiprows=[0], header=0)
+        else:
+            df = pd.read_csv(file_path)
+        
+        df.columns = df.columns.str.strip()
         num_rows = len(df)
         
         # Determine date column based on file type - be more flexible
@@ -63,7 +69,23 @@ def extract_file_info(file_path, file_type):
         
         if date_col and date_col in df.columns:
             try:
-                df[date_col] = pd.to_datetime(df[date_col], errors='coerce')
+                # For UE files, try DD/MM/YYYY format first (common in UberEats exports)
+                if file_type == 'ue':
+                    df[date_col] = pd.to_datetime(df[date_col], format='%d/%m/%Y', errors='coerce')
+                    if df[date_col].isna().all():
+                        # If all failed, try MM/DD/YYYY format
+                        df[date_col] = pd.to_datetime(df[date_col], format='%m/%d/%Y', errors='coerce')
+                else:
+                    # For DD files, try YYYY-MM-DD format first
+                    df[date_col] = pd.to_datetime(df[date_col], format='%Y-%m-%d', errors='coerce')
+                    if df[date_col].isna().all():
+                        # If all failed, try MM/DD/YYYY format
+                        df[date_col] = pd.to_datetime(df[date_col], format='%m/%d/%Y', errors='coerce')
+                
+                # Fall back to automatic parsing if format doesn't match
+                if df[date_col].isna().all():
+                    df[date_col] = pd.to_datetime(df[date_col], errors='coerce')
+                
                 df_with_dates = df.dropna(subset=[date_col])
                 if len(df_with_dates) > 0:
                     start_date = df_with_dates[date_col].min().date()
