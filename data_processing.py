@@ -136,6 +136,10 @@ def load_and_aggregate_dd_data(excluded_dates=None, pre_start_date=None, pre_end
         return (pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame(),
                 pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame())
     
+    # Debug: Show file info
+    st.info(f"🔍 DEBUG: Loading DoorDash data from: {dd_data_path}")
+    st.info(f"🔍 DEBUG: File exists: {dd_data_path.exists()}")
+    
     # Use master file dd-data.csv
     # For LastYear_Pre_vs_Post: pre24 = last year's pre dates, post24 = last year's post dates
     # For current year: pre25 = current pre dates, post25 = current post dates
@@ -144,25 +148,36 @@ def load_and_aggregate_dd_data(excluded_dates=None, pre_start_date=None, pre_end
     pre_24_start, pre_24_end = get_last_year_dates(pre_start_date, pre_end_date)
     post_24_start, post_24_end = get_last_year_dates(post_start_date, post_end_date)
     
+    st.info(f"🔍 DEBUG: Date ranges - Pre 24: {pre_24_start} to {pre_24_end}, Post 24: {post_24_start} to {post_24_end}")
+    st.info(f"🔍 DEBUG: Date ranges - Pre 25: {pre_start_date} to {pre_end_date}, Post 25: {post_start_date} to {post_end_date}")
+    
     # Process for last year's Pre period (for LastYear_Pre_vs_Post calculation)
+    st.info("🔍 DEBUG: Processing Pre 24 (last year pre)...")
     pre_24_sales, pre_24_payouts, pre_24_orders = process_master_file_for_dd(
         dd_data_path, pre_24_start, pre_24_end, excluded_dates
     )
+    st.info(f"🔍 DEBUG: Pre 24 results - Sales rows: {len(pre_24_sales)}, Payouts rows: {len(pre_24_payouts)}, Orders rows: {len(pre_24_orders)}")
     
     # Process for current year's Pre period
+    st.info("🔍 DEBUG: Processing Pre 25 (current year pre)...")
     pre_25_sales, pre_25_payouts, pre_25_orders = process_master_file_for_dd(
         dd_data_path, pre_start_date, pre_end_date, excluded_dates
     )
+    st.info(f"🔍 DEBUG: Pre 25 results - Sales rows: {len(pre_25_sales)}, Payouts rows: {len(pre_25_payouts)}, Orders rows: {len(pre_25_orders)}")
     
     # For YoY: post24 = last year's post dates, post25 = current post dates
+    st.info("🔍 DEBUG: Processing Post 24 (last year post)...")
     post_24_sales, post_24_payouts, post_24_orders = process_master_file_for_dd(
         dd_data_path, post_24_start, post_24_end, excluded_dates
     )
+    st.info(f"🔍 DEBUG: Post 24 results - Sales rows: {len(post_24_sales)}, Payouts rows: {len(post_24_payouts)}, Orders rows: {len(post_24_orders)}")
     
     # post25 = current post dates
+    st.info("🔍 DEBUG: Processing Post 25 (current year post)...")
     post_25_sales, post_25_payouts, post_25_orders = process_master_file_for_dd(
         dd_data_path, post_start_date, post_end_date, excluded_dates
     )
+    st.info(f"🔍 DEBUG: Post 25 results - Sales rows: {len(post_25_sales)}, Payouts rows: {len(post_25_payouts)}, Orders rows: {len(post_25_orders)}")
     
     return (pre_24_sales, pre_24_payouts, pre_24_orders, post_24_sales, post_24_payouts, post_24_orders,
             pre_25_sales, pre_25_payouts, pre_25_orders, post_25_sales, post_25_payouts, post_25_orders)

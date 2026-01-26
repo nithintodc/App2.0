@@ -20,11 +20,44 @@ def process_master_file_for_dd(file_path, start_date, end_date, excluded_dates=N
         Tuple of (sales_agg, payout_agg, orders_agg) DataFrames
     """
     try:
-        # Load and filter by date range using "Timestamp local date" column
-        df = filter_master_file_by_date_range(file_path, start_date, end_date, 'Timestamp local date', excluded_dates)
+        # Debug: Show file path and date range
+        st.info(f"🔍 DEBUG: Processing DoorDash file: {file_path.name}")
+        st.info(f"🔍 DEBUG: Date range: {start_date} to {end_date}")
         
+        # Load and filter by date range using "Timestamp local date" column variations
+        # Try multiple variations: "Timestamp local date", "Timestamp Local Date", "Date", etc.
+        date_col_variations = ['Timestamp local date', 'Timestamp Local Date', 'Timestamp Local date', 
+                              'timestamp local date', 'Date', 'date', 'Timestamp', 'timestamp']
+        df = filter_master_file_by_date_range(file_path, start_date, end_date, date_col_variations, excluded_dates)
+        
+        # Debug: Show filtering results
         if df.empty:
+            st.warning(f"⚠️ DEBUG: No data found after filtering. File: {file_path.name}, Date range: {start_date} to {end_date}")
+            # Try to load the file without filtering to see what's available
+            try:
+                df_raw = pd.read_csv(file_path)
+                df_raw.columns = df_raw.columns.str.strip()
+                st.info(f"🔍 DEBUG: Raw file has {len(df_raw)} rows and columns: {list(df_raw.columns)[:10]}")
+                # Check if date column exists
+                from utils import find_date_column
+                found_col = find_date_column(df_raw, date_col_variations)
+                if found_col:
+                    st.info(f"🔍 DEBUG: Found date column: '{found_col}'")
+                    # Show sample dates
+                    if found_col in df_raw.columns:
+                        df_raw[found_col] = pd.to_datetime(df_raw[found_col], errors='coerce')
+                        df_with_dates = df_raw.dropna(subset=[found_col])
+                        if len(df_with_dates) > 0:
+                            min_date = df_with_dates[found_col].min()
+                            max_date = df_with_dates[found_col].max()
+                            st.info(f"🔍 DEBUG: Date range in file: {min_date.date()} to {max_date.date()}")
+                else:
+                    st.error(f"❌ DEBUG: Date column not found! Tried: {date_col_variations}")
+            except Exception as e:
+                st.error(f"❌ DEBUG: Error loading raw file: {str(e)}")
             return pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
+        else:
+            st.success(f"✅ DEBUG: Found {len(df)} rows after filtering")
         
         # The columns should be "Merchant store ID" (or "Store ID") and "Subtotal"
         store_col = 'Merchant store ID'
