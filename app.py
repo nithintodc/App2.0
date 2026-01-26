@@ -671,21 +671,49 @@ def main():
         else:
             st.info("No data available for Combined Table 1")
     
-    # Combined Table 2 (YoY) - removed for now
+    # Combined Table 2 (YoY) - Store-Level
+    if combined_store_table2 is not None and not combined_store_table2.empty:
+        st.subheader("Combined Table 2: Year-over-Year Analysis (Store-Level)")
+        combined_store2_display = combined_store_table2.reset_index() if combined_store_table2.index.name == 'Store ID' else combined_store_table2.copy()
+        
+        # Filter out rows with no data (both last year-post and post are 0 or NaN)
+        if 'last year-post' in combined_store2_display.columns and 'post' in combined_store2_display.columns:
+            combined_store2_display = combined_store2_display[
+                (combined_store2_display['last year-post'].fillna(0) != 0) | (combined_store2_display['post'].fillna(0) != 0)
+            ]
+        
+        # Only display if there's data after filtering
+        if not combined_store2_display.empty:
+            # Format dollar columns
+            if 'last year-post' in combined_store2_display.columns:
+                combined_store2_display['last year-post'] = combined_store2_display['last year-post'].apply(lambda x: f"${x:,.1f}" if isinstance(x, (int, float)) else x)
+            if 'post' in combined_store2_display.columns:
+                combined_store2_display['post'] = combined_store2_display['post'].apply(lambda x: f"${x:,.1f}" if isinstance(x, (int, float)) else x)
+            if 'YoY' in combined_store2_display.columns:
+                combined_store2_display['YoY'] = combined_store2_display['YoY'].apply(lambda x: f"${x:,.1f}" if isinstance(x, (int, float)) else x)
+            # Format percentage column
+            if 'YoY%' in combined_store2_display.columns:
+                combined_store2_display['YoY%'] = combined_store2_display['YoY%'].apply(lambda x: f"{x:.1f}%" if isinstance(x, (int, float)) else x)
+            
+            if 'Store ID' in combined_store2_display.columns:
+                combined_store2_display = combined_store2_display.set_index('Store ID')
+            st.dataframe(combined_store2_display, use_container_width=True, height=400)
+        else:
+            st.info("No data available for Combined Table 2")
     
     st.divider()
     
     # 2. DoorDash Store-Level Tables
     st.header("🚪 DoorDash Store-Level Analysis")
     if dd_table1 is not None:
-        display_store_tables("DoorDash", dd_table1, None)
+        display_store_tables("DoorDash", dd_table1, dd_table2)
     
     st.divider()
     
     # 3. UberEats Store-Level Tables
     st.header("🚗 UberEats Store-Level Analysis")
     if ue_table1 is not None:
-        display_store_tables("UberEats", ue_table1, None)
+        display_store_tables("UberEats", ue_table1, ue_table2)
     
     st.divider()
     

@@ -200,10 +200,12 @@ def load_and_aggregate_new_customers(excluded_dates=None, pre_start_date=None, p
             DataFrame with Store ID and New Customers aggregated
         """
         if marketing_folder_path is None:
+            st.warning("⚠️ Marketing folder path is None. Cannot load new customers data.")
             return pd.DataFrame()
         
         marketing_folder_path = Path(marketing_folder_path)
         if not marketing_folder_path.exists():
+            st.warning(f"⚠️ Marketing folder not found: {marketing_folder_path}. Cannot load new customers data.")
             return pd.DataFrame()
         
         all_data = []
@@ -212,6 +214,7 @@ def load_and_aggregate_new_customers(excluded_dates=None, pre_start_date=None, p
         marketing_dirs = [d for d in marketing_folder_path.iterdir() if d.is_dir() and d.name.startswith('marketing_')]
         
         if not marketing_dirs:
+            st.warning(f"⚠️ No marketing_* folders found in {marketing_folder_path}. Cannot load new customers data.")
             return pd.DataFrame()
         
         # Find all MARKETING_PROMOTION*.csv files
@@ -225,9 +228,18 @@ def load_and_aggregate_new_customers(excluded_dates=None, pre_start_date=None, p
                     
                     # Check for required columns
                     if 'Date' not in df.columns:
+                        st.warning(f"⚠️ 'Date' column not found in {promotion_file.name}. Available columns: {list(df.columns)[:5]}")
                         continue
                     
-                    if 'New customers acquired' not in df.columns:
+                    # Check for "New customers acquired" column (case-insensitive)
+                    new_customers_col = None
+                    for col in df.columns:
+                        if 'new customers acquired' in col.lower():
+                            new_customers_col = col
+                            break
+                    
+                    if new_customers_col is None:
+                        st.warning(f"⚠️ 'New customers acquired' column not found in {promotion_file.name}. Available columns: {list(df.columns)[:10]}")
                         continue
                     
                     # Normalize store ID column
@@ -279,15 +291,27 @@ def load_and_aggregate_new_customers(excluded_dates=None, pre_start_date=None, p
         if store_col is None or store_col not in combined_df.columns:
             return pd.DataFrame()
         
+        # Find the actual column name for "New customers acquired" (case-insensitive)
+        new_customers_col = None
+        for col in combined_df.columns:
+            if 'new customers acquired' in col.lower():
+                new_customers_col = col
+                break
+        
+        if new_customers_col is None:
+            st.warning(f"⚠️ 'New customers acquired' column not found in combined data. Available columns: {list(combined_df.columns)[:10]}")
+            return pd.DataFrame()
+        
         # Convert "New customers acquired" to numeric
-        combined_df['New customers acquired'] = pd.to_numeric(combined_df['New customers acquired'], errors='coerce')
-        combined_df = combined_df.dropna(subset=[store_col, 'New customers acquired'])
+        combined_df[new_customers_col] = pd.to_numeric(combined_df[new_customers_col], errors='coerce')
+        combined_df = combined_df.dropna(subset=[store_col, new_customers_col])
         
         if combined_df.empty:
+            st.warning(f"⚠️ No data found after filtering for date range {start_date} to {end_date}")
             return pd.DataFrame()
         
         # Group by Store ID and sum New Customers
-        new_customers_agg = combined_df.groupby(store_col)['New customers acquired'].sum().reset_index()
+        new_customers_agg = combined_df.groupby(store_col)[new_customers_col].sum().reset_index()
         new_customers_agg.columns = ['Store ID', 'New Customers']
         
         # Convert Store ID to string to match other dataframes
@@ -309,35 +333,34 @@ def load_and_aggregate_new_customers(excluded_dates=None, pre_start_date=None, p
         pre_24_start, pre_24_end = get_last_year_dates(pre_start_date, pre_end_date)
         post_24_start, post_24_end = get_last_year_dates(post_start_date, post_end_date)
         
-        # Parse dates to determine which year they belong to
-        pre_24_start_dt = pd.to_datetime(pre_24_start, format='%m/%d/%Y')
-        post_24_start_dt = pd.to_datetime(post_24_start, format='%m/%d/%Y')
-        pre_start = pd.to_datetime(pre_start_date, format='%m/%d/%Y') if isinstance(pre_start_date, str) else pre_start_date
-        post_start = pd.to_datetime(post_start_date, format='%m/%d/%Y') if isinstance(post_start_date, str) else post_start_date
+        # Process all date ranges - don't restrict by year
+        # Pre 24: Use last year's pre dates (for LastYear_Pre_vs_Post)
+        dd_pre_24_nc = process_marketing_promotion_files_for_new_customers(
+            marketing_folder_path, pre_24_start, pre_24_end, excluded_dates
+        )
         
-        # Pre 2024: Use last year's pre dates (for LastYear_Pre_vs_Post)
-        if pre_24_start_dt.year == 2024:
-            dd_pre_24_nc = process_marketing_promotion_files_for_new_customers(
-                marketing_folder_path, pre_24_start, pre_24_end, excluded_dates
-            )
+        # Pre 25: Use current pre dates
+        dd_pre_25_nc = process_marketing_promotion_files_for_new_customers(
+            marketing_folder_path, pre_start_date, pre_end_date, excluded_dates
+        )
         
-        # Pre 2025: Use current pre dates
-        if pre_start.year == 2025:
-            dd_pre_25_nc = process_marketing_promotion_files_for_new_customers(
-                marketing_folder_path, pre_start_date, pre_end_date, excluded_dates
-            )
+        # Post 24: Use last year's post dates (for LastYear_Pre_vs_Post and YoY)
+        dd_post_24_nc = process_marketing_promotion_files_for_new_customers(
+            marketing_folder_path, post_24_start, post_24_end, excluded_dates
+        )
         
-        # Post 2024: Use last year's post dates (for LastYear_Pre_vs_Post and YoY)
-        if post_24_start_dt.year == 2024:
-            dd_post_24_nc = process_marketing_promotion_files_for_new_customers(
-                marketing_folder_path, post_24_start, post_24_end, excluded_dates
-            )
+        # Post 25: Use current post dates (for YoY)
+        dd_post_25_nc = process_marketing_promotion_files_for_new_customers(
+            marketing_folder_path, post_start_date, post_end_date, excluded_dates
+        )
         
-        # Post 2025: Use current post dates (for YoY)
-        if post_start.year == 2025:
-            dd_post_25_nc = process_marketing_promotion_files_for_new_customers(
-                marketing_folder_path, post_start_date, post_end_date, excluded_dates
-            )
+        # Debug: Show summary of loaded new customers data
+        total_pre_24 = dd_pre_24_nc['New Customers'].sum() if not dd_pre_24_nc.empty else 0
+        total_pre_25 = dd_pre_25_nc['New Customers'].sum() if not dd_pre_25_nc.empty else 0
+        total_post_24 = dd_post_24_nc['New Customers'].sum() if not dd_post_24_nc.empty else 0
+        total_post_25 = dd_post_25_nc['New Customers'].sum() if not dd_post_25_nc.empty else 0
+        if total_pre_24 + total_pre_25 + total_post_24 + total_post_25 == 0:
+            st.info(f"ℹ️ No new customers data found in marketing promotion files for the specified date ranges. Please verify that marketing_* folders contain MARKETING_PROMOTION*.csv files with 'New customers acquired' column.")
     
     # Legacy support: If no marketing folder provided, try to use old file paths
     def process_dd_mkt_file(file_path, excluded_dates=None):

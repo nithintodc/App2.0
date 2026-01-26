@@ -83,7 +83,36 @@ def display_store_tables(platform_name, table1_df, table2_df):
     else:
         st.info("No data available for Table 1")
     
-    # Table 2 (YoY) - removed for now
+    # Table 2 (YoY) - Display similar to Summary Analysis
+    if table2_df is not None and not table2_df.empty:
+        st.subheader(f"Table 2: Year-over-Year Analysis")
+        table2_display = table2_df.copy()
+        
+        # Filter out rows with no data (both last year-post and post are 0 or NaN)
+        if 'last year-post' in table2_display.columns and 'post' in table2_display.columns:
+            table2_display = table2_display[
+                (table2_display['last year-post'].fillna(0) != 0) | (table2_display['post'].fillna(0) != 0)
+            ]
+        
+        if not table2_display.empty:
+            # Format dollar columns
+            if 'last year-post' in table2_display.columns:
+                table2_display['last year-post'] = table2_display['last year-post'].apply(lambda x: f"${x:,.1f}")
+            if 'post' in table2_display.columns:
+                table2_display['post'] = table2_display['post'].apply(lambda x: f"${x:,.1f}")
+            if 'YoY' in table2_display.columns:
+                table2_display['YoY'] = table2_display['YoY'].apply(lambda x: f"${x:,.1f}")
+            # Format percentage column
+            if 'YoY%' in table2_display.columns:
+                table2_display['YoY%'] = table2_display['YoY%'].apply(lambda x: f"{x:.1f}%")
+            
+            if 'Store ID' in table2_display.columns:
+                table2_display = table2_display.set_index('Store ID')
+            st.dataframe(table2_display, use_container_width=True, height=400)
+        else:
+            st.info("No data available for Table 2")
+    else:
+        st.info("No YoY data available for Table 2")
 
 
 def display_summary_tables(platform_name, summary_table1, summary_table2):
