@@ -39,11 +39,16 @@ def extract_file_info(file_path, file_type):
                     date_col = col
                     break
         elif file_type == 'ue':
-            # Try multiple possible column names for UE
-            possible_cols = ['Order date', 'Order Date', 'order date', 'Date', 'date', 'Order Date (Local)']
+            # Try multiple possible column names for UE (case-insensitive matching)
+            possible_cols = ['Order Date', 'Order date', 'order date', 'order Date', 'Date', 'date', 'Order Date (Local)']
             for col in df.columns:
-                col_lower = col.lower()
-                if any(possible.lower() in col_lower for possible in possible_cols):
+                col_lower = col.lower().strip()
+                # Try exact match first
+                if col in possible_cols:
+                    date_col = col
+                    break
+                # Then try case-insensitive match
+                if any(col_lower == possible.lower().strip() for possible in possible_cols):
                     date_col = col
                     break
         elif file_type == 'marketing':

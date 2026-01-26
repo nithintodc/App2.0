@@ -46,35 +46,46 @@ st.markdown("""
         border-right: 1px solid var(--border-color, rgba(250, 250, 250, 0.2));
     }
     
-    /* Button styling - Theme-aware */
+    /* Button styling - Dark text on light background for visibility */
     .stButton > button {
         border-radius: 8px;
         font-weight: 600;
         transition: all 0.3s;
-        background-color: var(--primary-color);
-        color: white;
-        border: none;
+        background-color: #f0f2f6 !important; /* Light background */
+        color: #262730 !important; /* Dark/black text */
+        border: 1px solid #d1d5db !important;
     }
     
     .stButton > button:hover {
         transform: translateY(-2px);
         box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-        opacity: 0.9;
+        background-color: #e5e7eb !important; /* Slightly darker on hover */
+        color: #262730 !important; /* Keep dark text */
     }
     
+    /* Download button styling - Dark text on light background */
     .stDownloadButton > button {
         border-radius: 8px;
         font-weight: 600;
         transition: all 0.3s;
-        background-color: var(--primary-color);
-        color: white;
-        border: none;
+        background-color: #f0f2f6 !important; /* Light background */
+        color: #262730 !important; /* Dark/black text */
+        border: 1px solid #d1d5db !important;
     }
     
     .stDownloadButton > button:hover {
         transform: translateY(-2px);
         box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-        opacity: 0.9;
+        background-color: #e5e7eb !important; /* Slightly darker on hover */
+        color: #262730 !important; /* Keep dark text */
+    }
+    
+    /* Ensure all button text is dark and visible */
+    .stButton > button,
+    .stDownloadButton > button,
+    button[data-testid="baseButton-secondary"],
+    button[data-testid="baseButton-primary"] {
+        color: #262730 !important; /* Force dark text */
     }
     
     /* File uploader styling */

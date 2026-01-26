@@ -348,16 +348,29 @@ def create_date_export(dd_pre_24_path, dd_post_24_path, dd_pre_25_path, dd_post_
             # Normalize store ID column (check for both 'Store ID' and 'Shop ID')
             df, store_col = normalize_store_id_column(df)
             
-            # Use "Order Date" for UE (capital 'D')
-            # Try both case variations for robustness
+            # Find "Order Date" column for UE (case-insensitive matching)
+            # Try all common variations: "Order Date", "Order date", "order date", "order Date"
             date_col = None
-            for col in df.columns:
-                if col.lower() == 'order date':
-                    date_col = col
+            preferred_names = ['Order Date', 'Order date', 'order date', 'order Date', 'Date', 'date']
+            
+            # First try exact match
+            for name in preferred_names:
+                if name in df.columns:
+                    date_col = name
                     break
             
+            # Then try case-insensitive match
             if date_col is None:
-                date_col = 'Order Date'  # Default fallback
+                df_cols_lower = {col.lower().strip(): col for col in df.columns}
+                for name in preferred_names:
+                    name_lower = name.lower().strip()
+                    if name_lower in df_cols_lower:
+                        date_col = df_cols_lower[name_lower]
+                        break
+            
+            if date_col is None:
+                st.warning(f"Date column not found in UE file. Available columns: {list(df.columns)[:10]}")
+                date_col = 'Order Date'  # Default fallback (may cause error if not present)
             
             sales_col = 'Sales (excl. tax)'
             payout_col = 'Total payout'

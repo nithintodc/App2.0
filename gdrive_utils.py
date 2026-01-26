@@ -17,25 +17,52 @@ class GoogleDriveManager:
         """
         Initialize Google Drive Manager.
         
+        Supports both Streamlit Cloud secrets and local file credentials.
+        Priority: Streamlit secrets > credentials_path > default file location
+        
         Args:
             credentials_path: Path to service account JSON file. 
                             If None, looks for todc-marketing-ad02212d4f16.json in app folder.
         """
-        if credentials_path is None:
-            # Default to the service account file in app folder
-            app_dir = Path(__file__).parent
-            credentials_path = app_dir / "todc-marketing-ad02212d4f16.json"
+        # Try Streamlit Cloud secrets first
+        credentials_info = None
+        try:
+            # Check if running on Streamlit Cloud with secrets
+            if hasattr(st, 'secrets') and 'gcp' in st.secrets and 'service_account' in st.secrets.gcp:
+                credentials_info = dict(st.secrets.gcp.service_account)
+                st.info("✅ Using credentials from Streamlit Cloud secrets")
+        except Exception:
+            pass
         
-        self.credentials_path = Path(credentials_path)
+        # If no secrets, try file path
+        if credentials_info is None:
+            if credentials_path is None:
+                # Default to the service account file in app folder
+                app_dir = Path(__file__).parent
+                credentials_path = app_dir / "todc-marketing-ad02212d4f16.json"
+            
+            self.credentials_path = Path(credentials_path)
+            
+            if not self.credentials_path.exists():
+                raise FileNotFoundError(
+                    f"Service account credentials not found at: {self.credentials_path}\n"
+                    "For Streamlit Cloud: Add credentials to Streamlit Cloud secrets.\n"
+                    "For local/VM: Place todc-marketing-*.json file in app folder."
+                )
+            
+            # Load from file
+            self.credentials = service_account.Credentials.from_service_account_file(
+                str(self.credentials_path),
+                scopes=['https://www.googleapis.com/auth/drive']
+            )
+        else:
+            # Use credentials from Streamlit secrets
+            self.credentials = service_account.Credentials.from_service_account_info(
+                credentials_info,
+                scopes=['https://www.googleapis.com/auth/drive']
+            )
+            self.credentials_path = None  # No file path when using secrets
         
-        if not self.credentials_path.exists():
-            raise FileNotFoundError(f"Service account credentials not found at: {self.credentials_path}")
-        
-        # Authenticate and build service
-        self.credentials = service_account.Credentials.from_service_account_file(
-            str(self.credentials_path),
-            scopes=['https://www.googleapis.com/auth/drive']
-        )
         self.service = build('drive', 'v3', credentials=self.credentials)
         self._shared_drive_id = None
         self._root_folder_id = None

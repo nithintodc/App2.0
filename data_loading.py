@@ -99,8 +99,11 @@ def process_master_file_for_ue(file_path, start_date, end_date, excluded_dates=N
         Tuple of (sales_agg, payout_agg, orders_agg) DataFrames
     """
     try:
-        # Load and filter by date range using "Order date" column
-        df = filter_master_file_by_date_range(file_path, start_date, end_date, 'Order date', excluded_dates)
+        # Load and filter by date range using "Order date" column (case-insensitive matching)
+        # Try all common variations: "Order Date", "Order date", "order date", "order Date"
+        df = filter_master_file_by_date_range(file_path, start_date, end_date, 
+                                               ['Order Date', 'Order date', 'order date', 'order Date', 'Date', 'date'], 
+                                               excluded_dates)
         
         if df.empty:
             return pd.DataFrame(), pd.DataFrame(), pd.DataFrame()

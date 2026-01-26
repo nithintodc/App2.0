@@ -83,6 +83,32 @@ def filter_excluded_dates(df, date_col, excluded_dates):
     return df
 
 
+def find_date_column(df, preferred_names):
+    """
+    Find a date column in DataFrame by case-insensitive matching.
+    
+    Args:
+        df: DataFrame to search
+        preferred_names: List of preferred column names (will be matched case-insensitively)
+    
+    Returns:
+        Actual column name found, or None if not found
+    """
+    # First try exact match
+    for name in preferred_names:
+        if name in df.columns:
+            return name
+    
+    # Then try case-insensitive match
+    df_cols_lower = {col.lower(): col for col in df.columns}
+    for name in preferred_names:
+        name_lower = name.lower()
+        if name_lower in df_cols_lower:
+            return df_cols_lower[name_lower]
+    
+    return None
+
+
 def filter_master_file_by_date_range(file_path, start_date, end_date, date_col_name, excluded_dates=None):
     """
     Filter a master CSV file by date range and excluded dates.
@@ -91,7 +117,7 @@ def filter_master_file_by_date_range(file_path, start_date, end_date, date_col_n
         file_path: Path to the CSV file
         start_date: Start date (MM/DD/YYYY format string or date object)
         end_date: End date (MM/DD/YYYY format string or date object)
-        date_col_name: Name of the date column in the CSV
+        date_col_name: Name of the date column in the CSV (or list of preferred names for case-insensitive matching)
         excluded_dates: Optional list of dates to exclude
     
     Returns:
@@ -105,13 +131,26 @@ def filter_master_file_by_date_range(file_path, start_date, end_date, date_col_n
             df = pd.read_csv(file_path)
         df.columns = df.columns.str.strip()
         
-        if date_col_name not in df.columns:
-            st.warning(f"Date column '{date_col_name}' not found in {file_path.name}")
+        # Handle case-insensitive date column matching
+        if isinstance(date_col_name, str):
+            # If single string, try to find it case-insensitively
+            preferred_names = [date_col_name]
+            # For UE files, also try common variations
+            if 'ue' in file_path.name.lower():
+                preferred_names = ['Order Date', 'Order date', 'order date', 'order Date', 'Date', 'date']
+        else:
+            preferred_names = date_col_name
+        
+        # Find the actual column name
+        actual_date_col = find_date_column(df, preferred_names)
+        
+        if actual_date_col is None:
+            st.warning(f"Date column not found in {file_path.name}. Tried: {preferred_names}. Available columns: {list(df.columns)[:10]}")
             return pd.DataFrame()
         
         # Convert date column to datetime
-        df[date_col_name] = pd.to_datetime(df[date_col_name], errors='coerce')
-        df = df.dropna(subset=[date_col_name])
+        df[actual_date_col] = pd.to_datetime(df[actual_date_col], errors='coerce')
+        df = df.dropna(subset=[actual_date_col])
         
         # Parse start and end dates
         if isinstance(start_date, str):
@@ -125,11 +164,11 @@ def filter_master_file_by_date_range(file_path, start_date, end_date, date_col_n
             end_dt = pd.to_datetime(end_date)
         
         # Filter by date range
-        df = df[(df[date_col_name] >= start_dt) & (df[date_col_name] <= end_dt)]
+        df = df[(df[actual_date_col] >= start_dt) & (df[actual_date_col] <= end_dt)]
         
         # Apply excluded dates filter
         if excluded_dates:
-            df = filter_excluded_dates(df, date_col_name, excluded_dates)
+            df = filter_excluded_dates(df, actual_date_col, excluded_dates)
         
         return df
     except Exception as e:
