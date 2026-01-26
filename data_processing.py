@@ -298,8 +298,16 @@ def load_and_aggregate_new_customers(excluded_dates=None, pre_start_date=None, p
                         else:
                             end_dt = pd.to_datetime(end_date)
                         
+                        st.info(f"🔍 DEBUG 4: Filtering for date range: {start_dt.date()} to {end_dt.date()}")
+                        st.info(f"   - Rows before date filtering: {len(df)}")
+                        st.info(f"   - Date range in file: {df['Date'].min().date()} to {df['Date'].max().date()}")
+                        
                         date_mask = (df['Date'] >= start_dt) & (df['Date'] <= end_dt)
                         df = df[date_mask]
+                        
+                        st.info(f"   - Rows after date filtering: {len(df)}")
+                        if len(df) > 0:
+                            st.info(f"   - Sum of 'New customers acquired' after filtering: {df[new_customers_col].sum()}")
                     
                     # Apply excluded dates filter
                     if excluded_dates and not df.empty:
@@ -351,6 +359,14 @@ def load_and_aggregate_new_customers(excluded_dates=None, pre_start_date=None, p
         
         # Convert Store ID to string to match other dataframes
         new_customers_agg['Store ID'] = new_customers_agg['Store ID'].astype(str)
+        
+        # Debug: Show final aggregation results
+        total_aggregated = new_customers_agg['New Customers'].sum()
+        st.info(f"🔍 DEBUG 5: Final aggregation for date range {start_date} to {end_date}:")
+        st.info(f"   - Total new customers aggregated: {total_aggregated}")
+        st.info(f"   - Number of stores: {len(new_customers_agg)}")
+        if len(new_customers_agg) > 0:
+            st.info(f"   - Sample store results (first 5): {new_customers_agg.head().to_dict('records')}")
         
         return new_customers_agg
     
