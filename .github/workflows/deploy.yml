@@ -1,0 +1,81 @@
+name: Deploy to GCP Compute Engine
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch:  # Allows manual triggering
+
+jobs:
+  deploy:
+    name: Deploy Streamlit App
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v1
+        with:
+          service_account_key: ${{ secrets.GCP_SA_KEY }}
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
+          export_default_credentials: true
+      
+      - name: Authenticate to Google Cloud
+        run: |
+          echo "${{ secrets.GCP_SA_KEY }}" > $HOME/gcp-key.json
+          gcloud auth activate-service-account --key-file=$HOME/gcp-key.json
+          gcloud config set project ${{ secrets.GCP_PROJECT_ID }}
+      
+      - name: Copy files to VM
+        run: |
+          gcloud compute scp --recurse \
+            --zone=${{ secrets.GCP_VM_ZONE }} \
+            . \
+            ${{ secrets.GCP_VM_USER }}@${{ secrets.GCP_VM_NAME }}:/tmp/streamlit-app-deploy/
+      
+      - name: Deploy application on VM
+        run: |
+          gcloud compute ssh ${{ secrets.GCP_VM_USER }}@${{ secrets.GCP_VM_NAME }} \
+            --zone=${{ secrets.GCP_VM_ZONE }} \
+            --command="
+            # Create backup
+            sudo cp -r /opt/streamlit-app /opt/streamlit-app-backup-\$(date +%Y%m%d-%H%M%S) || true
+            
+            # Stop the service
+            sudo systemctl stop streamlit || true
+            
+            # Copy new files (excluding .github folder from deployment)
+            sudo rm -rf /opt/streamlit-app/app/*
+            sudo cp -r /tmp/streamlit-app-deploy/* /opt/streamlit-app/app/
+            sudo rm -rf /opt/streamlit-app/app/.github
+            sudo chown -R ${{ secrets.GCP_VM_USER }}:${{ secrets.GCP_VM_USER }} /opt/streamlit-app/app
+            
+            # Update Python dependencies
+            cd /opt/streamlit-app/app
+            source venv/bin/activate || python3 -m venv venv && source venv/bin/activate
+            pip install --upgrade pip
+            pip install -r requirements.txt
+            
+            # Restart the service
+            sudo systemctl daemon-reload
+            sudo systemctl start streamlit
+            sudo systemctl status streamlit --no-pager
+            "
+      
+      - name: Verify deployment
+        run: |
+          echo "Deployment completed. Checking service status..."
+          gcloud compute ssh ${{ secrets.GCP_VM_USER }}@${{ secrets.GCP_VM_NAME }} \
+            --zone=${{ secrets.GCP_VM_ZONE }} \
+            --command="sudo systemctl status streamlit --no-pager | head -20"
+      
+      - name: Cleanup
+        if: always()
+        run: |
+          rm -f $HOME/gcp-key.json
+          gcloud compute ssh ${{ secrets.GCP_VM_USER }}@${{ secrets.GCP_VM_NAME }} \
+            --zone=${{ secrets.GCP_VM_ZONE }} \
+            --command="sudo rm -rf /tmp/streamlit-app-deploy" || true

@@ -1,0 +1,460 @@
+"""
+Google Drive utility functions for uploading files and managing folders.
+"""
+import os
+from pathlib import Path
+from google.oauth2 import service_account
+from googleapiclient.discovery import build
+from googleapiclient.http import MediaFileUpload
+from googleapiclient.errors import HttpError
+import streamlit as st
+
+
+class GoogleDriveManager:
+    """Manages Google Drive operations including folder creation and file uploads."""
+    
+    def __init__(self, credentials_path=None):
+        """
+        Initialize Google Drive Manager.
+        
+        Args:
+            credentials_path: Path to service account JSON file. 
+                            If None, looks for todc-marketing-ad02212d4f16.json in app folder.
+        """
+        if credentials_path is None:
+            # Default to the service account file in app folder
+            app_dir = Path(__file__).parent
+            credentials_path = app_dir / "todc-marketing-ad02212d4f16.json"
+        
+        self.credentials_path = Path(credentials_path)
+        
+        if not self.credentials_path.exists():
+            raise FileNotFoundError(f"Service account credentials not found at: {self.credentials_path}")
+        
+        # Authenticate and build service
+        self.credentials = service_account.Credentials.from_service_account_file(
+            str(self.credentials_path),
+            scopes=['https://www.googleapis.com/auth/drive']
+        )
+        self.service = build('drive', 'v3', credentials=self.credentials)
+        self._shared_drive_id = None
+        self._root_folder_id = None
+        self._shared_drive_name = "Data-Analysis-Uploads"
+    
+    def get_shared_drive_id(self, drive_name=None):
+        """
+        Get the shared drive ID by name.
+        
+        Args:
+            drive_name: Name of the shared drive (defaults to "Data-Analysis-Uploads")
+        
+        Returns:
+            Shared drive ID
+        """
+        if self._shared_drive_id is None:
+            if drive_name is None:
+                drive_name = self._shared_drive_name
+            
+            try:
+                # List all shared drives
+                results = self.service.drives().list(
+                    pageSize=100
+                ).execute()
+                
+                drives = results.get('drives', [])
+                
+                # Find the drive by name
+                for drive in drives:
+                    if drive['name'] == drive_name:
+                        self._shared_drive_id = drive['id']
+                        return self._shared_drive_id
+                
+                raise Exception(f"Shared drive '{drive_name}' not found. Please ensure the service account has access to it.")
+            
+            except HttpError as error:
+                raise Exception(f"Error finding shared drive: {error}")
+        
+        return self._shared_drive_id
+    
+    def get_shared_drive_root_folder_id(self):
+        """
+        Get ANY folder ID within the shared drive to use as parent.
+        For shared drives, we MUST always specify a parent folder that exists in the shared drive.
+        This method finds any existing folder in the shared drive to use as parent reference.
+        
+        Returns:
+            Folder ID within the shared drive that can be used as parent
+        """
+        shared_drive_id = self.get_shared_drive_id()
+        
+        # Query for ANY folder in the shared drive (not just root level)
+        # This ensures we find a folder that definitely exists in the shared drive
+        query = "mimeType='application/vnd.google-apps.folder' and trashed=false"
+        
+        try:
+            results = self.service.files().list(
+                q=query,
+                fields="files(id, name)",
+                supportsAllDrives=True,
+                includeItemsFromAllDrives=True,
+                corpora='drive',
+                driveId=shared_drive_id,
+                pageSize=1
+            ).execute()
+            
+            folders = results.get('files', [])
+            
+            if folders:
+                # Use the first folder we find as parent
+                # This ensures we're always within the shared drive context
+                return folders[0]['id']
+            else:
+                # No folders exist in the shared drive yet
+                # Try using the shared drive ID itself as parent (this might work for shared drives)
+                # If this doesn't work, the user will need to create a folder manually
+                try:
+                    # Attempt to create a folder using shared drive ID as parent
+                    folder_metadata = {
+                        'name': 'Root',
+                        'mimeType': 'application/vnd.google-apps.folder',
+                        'parents': [shared_drive_id]  # Try using drive ID as parent
+                    }
+                    
+                    folder = self.service.files().create(
+                        body=folder_metadata,
+                        fields='id',
+                        supportsAllDrives=True
+                    ).execute()
+                    
+                    folder_id = folder.get('id')
+                    
+                    # Verify it's actually in the shared drive
+                    verify_query = f"id='{folder_id}'"
+                    verify_results = self.service.files().list(
+                        q=verify_query,
+                        fields="files(id)",
+                        supportsAllDrives=True,
+                        includeItemsFromAllDrives=True,
+                        corpora='drive',
+                        driveId=shared_drive_id
+                    ).execute()
+                    
+                    if verify_results.get('files'):
+                        return folder_id
+                    else:
+                        # Folder was created but not in shared drive
+                        raise Exception("Could not create folder in shared drive")
+                        
+                except Exception as create_error:
+                    # If that didn't work, provide helpful error message
+                    raise Exception(
+                        f"No folders found in shared drive and could not create one automatically. "
+                        f"Please create at least one folder manually in the 'Data-Analysis-Uploads' "
+                        f"shared drive. Error: {create_error}"
+                    )
+        
+        except HttpError as error:
+            raise Exception(f"Error accessing shared drive: {error}")
+    
+    def get_or_create_folder(self, folder_name, parent_folder_id=None):
+        """
+        Get existing folder or create it if it doesn't exist.
+        Works with shared drives. ALWAYS requires a parent within the shared drive.
+        
+        Args:
+            folder_name: Name of the folder
+            parent_folder_id: ID of parent folder (None will use shared drive root folder)
+        
+        Returns:
+            Folder ID
+        """
+        try:
+            # Get shared drive ID
+            shared_drive_id = self.get_shared_drive_id()
+            
+            # If no parent specified, get the root folder ID of the shared drive
+            if parent_folder_id is None:
+                parent_folder_id = self.get_shared_drive_root_folder_id()
+            
+            # Search for existing folder with the specified parent
+            query = f"name='{folder_name}' and mimeType='application/vnd.google-apps.folder' and trashed=false and '{parent_folder_id}' in parents"
+            
+            results = self.service.files().list(
+                q=query,
+                fields="files(id, name)",
+                supportsAllDrives=True,
+                includeItemsFromAllDrives=True,
+                corpora='drive',
+                driveId=shared_drive_id
+            ).execute()
+            
+            folders = results.get('files', [])
+            
+            if folders:
+                # Folder exists, return its ID
+                return folders[0]['id']
+            else:
+                # Create new folder - MUST have a parent within shared drive
+                folder_metadata = {
+                    'name': folder_name,
+                    'mimeType': 'application/vnd.google-apps.folder',
+                    'parents': [parent_folder_id]  # Always specify parent for shared drives
+                }
+                
+                folder = self.service.files().create(
+                    body=folder_metadata,
+                    fields='id',
+                    supportsAllDrives=True
+                ).execute()
+                
+                return folder.get('id')
+        
+        except HttpError as error:
+            raise Exception(f"Error creating/getting folder: {error}")
+    
+    def get_root_folder(self, root_folder_name):
+        """
+        Get or create the root folder for this project within the shared drive.
+        
+        Args:
+            root_folder_name: Name of the root folder (e.g., "BigGee-Jan")
+        
+        Returns:
+            Root folder ID
+        """
+        if self._root_folder_id is None:
+            # Create root folder in shared drive
+            # parent_folder_id=None will use shared drive root folder as parent
+            self._root_folder_id = self.get_or_create_folder(root_folder_name, parent_folder_id=None)
+        return self._root_folder_id
+    
+    def upload_file(self, file_path, folder_id, file_name=None):
+        """
+        Upload a file to Google Drive.
+        
+        Args:
+            file_path: Path to the local file to upload
+            folder_id: ID of the Google Drive folder to upload to
+            file_name: Optional custom name for the file in Drive (uses local filename if None)
+        
+        Returns:
+            Dictionary with file_id and webViewLink
+        """
+        file_path = Path(file_path)
+        
+        if not file_path.exists():
+            raise FileNotFoundError(f"File not found: {file_path}")
+        
+        if file_name is None:
+            file_name = file_path.name
+        
+        try:
+            # Get shared drive ID for query
+            shared_drive_id = self.get_shared_drive_id()
+            
+            # Check if file already exists in the folder
+            query = f"name='{file_name}' and '{folder_id}' in parents and trashed=false"
+            results = self.service.files().list(
+                q=query,
+                fields="files(id, name)",
+                supportsAllDrives=True,
+                includeItemsFromAllDrives=True,
+                corpora='drive',
+                driveId=shared_drive_id
+            ).execute()
+            
+            existing_files = results.get('files', [])
+            
+            file_metadata = {
+                'name': file_name,
+                'parents': [folder_id]
+            }
+            
+            media = MediaFileUpload(str(file_path), resumable=True)
+            
+            if existing_files:
+                # Update existing file
+                file_id = existing_files[0]['id']
+                file = self.service.files().update(
+                    fileId=file_id,
+                    body=file_metadata,
+                    media_body=media,
+                    fields='id, webViewLink',
+                    supportsAllDrives=True
+                ).execute()
+            else:
+                # Create new file in shared drive
+                # Note: driveId is not a valid parameter for files().create()
+                # The file will be created in the folder specified by parents in file_metadata
+                file = self.service.files().create(
+                    body=file_metadata,
+                    media_body=media,
+                    fields='id, webViewLink',
+                    supportsAllDrives=True
+                ).execute()
+            
+            return {
+                'file_id': file.get('id'),
+                'webViewLink': file.get('webViewLink'),
+                'file_name': file_name
+            }
+        
+        except HttpError as error:
+            raise Exception(f"Error uploading file: {error}")
+    
+    def upload_file_to_subfolder(self, file_path, root_folder_name, subfolder_name, file_name=None):
+        """
+        Upload a file to a subfolder within the root folder.
+        Creates subfolder if it doesn't exist.
+        
+        Args:
+            file_path: Path to the local file to upload
+            root_folder_name: Name of the root folder
+            subfolder_name: Name of the subfolder (e.g., "date-pivots", "outputs")
+            file_name: Optional custom name for the file in Drive
+        
+        Returns:
+            Dictionary with file_id, webViewLink, and folder info
+        """
+        # Get or create root folder
+        root_folder_id = self.get_root_folder(root_folder_name)
+        
+        # Get or create subfolder
+        subfolder_id = self.get_or_create_folder(subfolder_name, parent_folder_id=root_folder_id)
+        
+        # Upload file
+        result = self.upload_file(file_path, subfolder_id, file_name)
+        result['folder_name'] = subfolder_name
+        
+        return result
+    
+    def upload_directory(self, directory_path, root_folder_name, subfolder_name="datasets", exclude_dirs=None):
+        """
+        Upload all files from a directory to Google Drive, preserving folder structure.
+        
+        Args:
+            directory_path: Path to the directory to upload
+            root_folder_name: Name of the root folder in Google Drive
+            subfolder_name: Name of the subfolder to create in Google Drive (default: "datasets")
+            exclude_dirs: List of directory names to exclude (default: ["app"])
+        
+        Returns:
+            Dictionary with upload results: uploaded_files, failed_files, total_count
+        """
+        if exclude_dirs is None:
+            exclude_dirs = ["app"]
+        
+        directory_path = Path(directory_path)
+        if not directory_path.exists() or not directory_path.is_dir():
+            raise ValueError(f"Directory not found: {directory_path}")
+        
+        # Get or create root folder
+        root_folder_id = self.get_root_folder(root_folder_name)
+        
+        # Get or create datasets subfolder
+        datasets_folder_id = self.get_or_create_folder(subfolder_name, parent_folder_id=root_folder_id)
+        
+        uploaded_files = []
+        failed_files = []
+        total_count = 0
+        
+        # Walk through directory
+        for item in directory_path.iterdir():
+            # Skip excluded directories
+            if item.name in exclude_dirs:
+                continue
+            
+            try:
+                if item.is_file():
+                    # Upload file directly to datasets folder
+                    total_count += 1
+                    result = self.upload_file(item, datasets_folder_id, item.name)
+                    uploaded_files.append({
+                        'name': item.name,
+                        'path': str(item),
+                        'file_id': result['file_id'],
+                        'webViewLink': result['webViewLink']
+                    })
+                elif item.is_dir():
+                    # Create folder in Google Drive and upload contents recursively
+                    folder_id = self.get_or_create_folder(item.name, parent_folder_id=datasets_folder_id)
+                    
+                    # Recursively process directory
+                    def upload_directory_recursive(dir_path, parent_folder_id):
+                        """Recursively upload directory contents maintaining folder structure."""
+                        nonlocal total_count
+                        for dir_item in dir_path.iterdir():
+                            try:
+                                if dir_item.is_file():
+                                    total_count += 1
+                                    result = self.upload_file(dir_item, parent_folder_id, dir_item.name)
+                                    uploaded_files.append({
+                                        'name': dir_item.name,
+                                        'path': str(dir_item),
+                                        'file_id': result['file_id'],
+                                        'webViewLink': result['webViewLink']
+                                    })
+                                elif dir_item.is_dir():
+                                    # Create subfolder and recurse
+                                    subfolder_id = self.get_or_create_folder(dir_item.name, parent_folder_id=parent_folder_id)
+                                    upload_directory_recursive(dir_item, subfolder_id)
+                            except Exception as e:
+                                failed_files.append({
+                                    'name': dir_item.name,
+                                    'path': str(dir_item),
+                                    'error': str(e)
+                                })
+                    
+                    # Start recursive upload
+                    upload_directory_recursive(item, folder_id)
+            
+            except Exception as e:
+                failed_files.append({
+                    'name': item.name,
+                    'path': str(item),
+                    'error': str(e)
+                })
+        
+        return {
+            'uploaded_files': uploaded_files,
+            'failed_files': failed_files,
+            'total_count': total_count,
+            'success_count': len(uploaded_files),
+            'failed_count': len(failed_files),
+            'folder_name': subfolder_name
+        }
+
+
+def get_drive_manager():
+    """
+    Get a singleton instance of GoogleDriveManager.
+    Uses Streamlit session state to cache the instance.
+    """
+    if 'gdrive_manager' not in st.session_state:
+        try:
+            st.session_state.gdrive_manager = GoogleDriveManager()
+        except Exception as e:
+            st.error(f"Failed to initialize Google Drive: {str(e)}")
+            return None
+    
+    return st.session_state.get('gdrive_manager')
+
+
+def get_shared_drive_info():
+    """
+    Helper function to get shared drive information for debugging.
+    Returns the drive ID and name.
+    Can be called from Streamlit to display drive info.
+    """
+    try:
+        manager = get_drive_manager()
+        if manager:
+            drive_id = manager.get_shared_drive_id()
+            return {
+                'drive_id': drive_id,
+                'drive_name': manager._shared_drive_name
+            }
+    except Exception as e:
+        return {'error': str(e)}
+    
+    return None
