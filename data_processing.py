@@ -454,8 +454,9 @@ def load_and_aggregate_new_customers(excluded_dates=None, pre_start_date=None, p
         except Exception as e:
             return pd.DataFrame()
     
-    # Fallback to legacy files if marketing folder not provided
-    if marketing_folder_path is None or not Path(marketing_folder_path).exists():
+    # Fallback to legacy files if marketing folder not provided OR if data is still empty
+    if (marketing_folder_path is None or not Path(marketing_folder_path).exists()) or \
+       (dd_pre_24_nc.empty and dd_post_24_nc.empty and dd_pre_25_nc.empty and dd_post_25_nc.empty):
         if dd_pre_24_nc.empty:
             dd_pre_24_nc = process_dd_mkt_file(DD_MKT_PRE_24, excluded_dates)
         if dd_post_24_nc.empty:
@@ -508,12 +509,6 @@ def load_and_aggregate_new_customers(excluded_dates=None, pre_start_date=None, p
             st.error(traceback.format_exc())
             return pd.DataFrame()
     
-    # Load all mkt files
-    dd_pre_24_nc = process_dd_mkt_file(DD_MKT_PRE_24, excluded_dates)
-    dd_post_24_nc = process_dd_mkt_file(DD_MKT_POST_24, excluded_dates)
-    dd_pre_25_nc = process_dd_mkt_file(DD_MKT_PRE_25, excluded_dates)
-    dd_post_25_nc = process_dd_mkt_file(DD_MKT_POST_25, excluded_dates)
-    
     # For UE, we need to get platform-level totals since there's no Store ID (legacy support)
     def get_ue_platform_total(file_path, excluded_dates=None):
         """Get total new customers from UE mkt file (platform level)
@@ -536,6 +531,13 @@ def load_and_aggregate_new_customers(excluded_dates=None, pre_start_date=None, p
     ue_post_24_total = get_ue_platform_total(UE_MKT_POST_24, excluded_dates)
     ue_pre_25_total = get_ue_platform_total(UE_MKT_PRE_25, excluded_dates)
     ue_post_25_total = get_ue_platform_total(UE_MKT_POST_25, excluded_dates)
+    
+    # Debug: Show what's being returned
+    st.info(f"🔍 DEBUG 12: Before return from load_and_aggregate_new_customers:")
+    st.info(f"   - dd_pre_24_nc empty: {dd_pre_24_nc.empty}, rows: {len(dd_pre_24_nc)}, sum: {dd_pre_24_nc['New Customers'].sum() if not dd_pre_24_nc.empty and 'New Customers' in dd_pre_24_nc.columns else 0}")
+    st.info(f"   - dd_post_24_nc empty: {dd_post_24_nc.empty}, rows: {len(dd_post_24_nc)}, sum: {dd_post_24_nc['New Customers'].sum() if not dd_post_24_nc.empty and 'New Customers' in dd_post_24_nc.columns else 0}")
+    st.info(f"   - dd_pre_25_nc empty: {dd_pre_25_nc.empty}, rows: {len(dd_pre_25_nc)}, sum: {dd_pre_25_nc['New Customers'].sum() if not dd_pre_25_nc.empty and 'New Customers' in dd_pre_25_nc.columns else 0}")
+    st.info(f"   - dd_post_25_nc empty: {dd_post_25_nc.empty}, rows: {len(dd_post_25_nc)}, sum: {dd_post_25_nc['New Customers'].sum() if not dd_post_25_nc.empty and 'New Customers' in dd_post_25_nc.columns else 0}")
     
     # Return DD new customers DataFrames and UE totals as a tuple for platform-level aggregation
     return (dd_pre_24_nc, dd_post_24_nc, dd_pre_25_nc, dd_post_25_nc,
