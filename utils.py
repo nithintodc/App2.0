@@ -152,8 +152,6 @@ def filter_master_file_by_date_range(file_path, start_date, end_date, date_col_n
             st.warning(f"Date column not found in {file_path.name}. Tried: {preferred_names}. Available columns: {list(df.columns)[:10]}")
             return pd.DataFrame()
         
-        st.info(f"🔍 DEBUG: Found date column '{actual_date_col}' in {file_path.name}")
-        
         # Convert date column to datetime - try multiple formats
         # For UE files, try DD/MM/YYYY format first (common in UberEats exports)
         # For DD files, try YYYY-MM-DD format first (common in DoorDash exports)
@@ -178,14 +176,7 @@ def filter_master_file_by_date_range(file_path, start_date, end_date, date_col_n
                 # Fall back to automatic parsing
                 df[actual_date_col] = pd.to_datetime(df[actual_date_col], errors='coerce')
         
-        # Show date range in file before filtering
-        df_with_dates = df.dropna(subset=[actual_date_col])
-        if len(df_with_dates) > 0:
-            min_date_in_file = df_with_dates[actual_date_col].min()
-            max_date_in_file = df_with_dates[actual_date_col].max()
-            st.info(f"🔍 DEBUG: Date range in file: {min_date_in_file.date()} to {max_date_in_file.date()} ({len(df_with_dates)} rows with valid dates)")
-        
-        df = df_with_dates.copy()
+        df = df.dropna(subset=[actual_date_col])
         
         # Parse start and end dates
         if isinstance(start_date, str):
@@ -198,13 +189,8 @@ def filter_master_file_by_date_range(file_path, start_date, end_date, date_col_n
         else:
             end_dt = pd.to_datetime(end_date)
         
-        st.info(f"🔍 DEBUG: Filtering for date range: {start_dt.date()} to {end_dt.date()}")
-        
         # Filter by date range
-        df_filtered = df[(df[actual_date_col] >= start_dt) & (df[actual_date_col] <= end_dt)]
-        st.info(f"🔍 DEBUG: After date filtering: {len(df_filtered)} rows (from {len(df)} rows with valid dates)")
-        
-        df = df_filtered
+        df = df[(df[actual_date_col] >= start_dt) & (df[actual_date_col] <= end_dt)]
         
         # Apply excluded dates filter
         if excluded_dates:

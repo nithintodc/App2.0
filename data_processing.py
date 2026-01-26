@@ -72,12 +72,6 @@ def load_and_aggregate_ue_data(excluded_dates=None, pre_start_date=None, pre_end
         return (pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame(),
                 pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame())
     
-    # Debug: Show file info
-    st.info(f"🔍 DEBUG: Loading UberEats data from: {ue_data_path}")
-    st.info(f"🔍 DEBUG: File exists: {ue_data_path.exists()}")
-    st.info(f"🔍 DEBUG: File absolute path: {ue_data_path.resolve()}")
-    st.info(f"🔍 DEBUG: File size: {ue_data_path.stat().st_size / 1024 / 1024:.2f} MB" if ue_data_path.exists() else "File not found")
-    
     # Use master file ue-data.csv
     # For LastYear_Pre_vs_Post: pre24 = last year's pre dates, post24 = last year's post dates
     # For current year: pre25 = current pre dates, post25 = current post dates
@@ -86,36 +80,25 @@ def load_and_aggregate_ue_data(excluded_dates=None, pre_start_date=None, pre_end
     pre_24_start, pre_24_end = get_last_year_dates(pre_start_date, pre_end_date)
     post_24_start, post_24_end = get_last_year_dates(post_start_date, post_end_date)
     
-    st.info(f"🔍 DEBUG: Date ranges - Pre 24: {pre_24_start} to {pre_24_end}, Post 24: {post_24_start} to {post_24_end}")
-    st.info(f"🔍 DEBUG: Date ranges - Pre 25: {pre_start_date} to {pre_end_date}, Post 25: {post_start_date} to {post_end_date}")
-    
     # Process for last year's Pre period (for LastYear_Pre_vs_Post calculation)
-    st.info("🔍 DEBUG: Processing Pre 24 (last year pre)...")
     pre_24_sales, pre_24_payouts, pre_24_orders = process_master_file_for_ue(
         ue_data_path, pre_24_start, pre_24_end, excluded_dates
     )
-    st.info(f"🔍 DEBUG: Pre 24 results - Sales rows: {len(pre_24_sales)}, Payouts rows: {len(pre_24_payouts)}, Orders rows: {len(pre_24_orders)}")
     
     # Process for current year's Pre period
-    st.info("🔍 DEBUG: Processing Pre 25 (current year pre)...")
     pre_25_sales, pre_25_payouts, pre_25_orders = process_master_file_for_ue(
         ue_data_path, pre_start_date, pre_end_date, excluded_dates
     )
-    st.info(f"🔍 DEBUG: Pre 25 results - Sales rows: {len(pre_25_sales)}, Payouts rows: {len(pre_25_payouts)}, Orders rows: {len(pre_25_orders)}")
     
     # For YoY: post24 = last year's post dates, post25 = current post dates
-    st.info("🔍 DEBUG: Processing Post 24 (last year post)...")
     post_24_sales, post_24_payouts, post_24_orders = process_master_file_for_ue(
         ue_data_path, post_24_start, post_24_end, excluded_dates
     )
-    st.info(f"🔍 DEBUG: Post 24 results - Sales rows: {len(post_24_sales)}, Payouts rows: {len(post_24_payouts)}, Orders rows: {len(post_24_orders)}")
     
     # post25 = current post dates
-    st.info("🔍 DEBUG: Processing Post 25 (current year post)...")
     post_25_sales, post_25_payouts, post_25_orders = process_master_file_for_ue(
         ue_data_path, post_start_date, post_end_date, excluded_dates
     )
-    st.info(f"🔍 DEBUG: Post 25 results - Sales rows: {len(post_25_sales)}, Payouts rows: {len(post_25_payouts)}, Orders rows: {len(post_25_orders)}")
     
     return (pre_24_sales, pre_24_payouts, pre_24_orders, post_24_sales, post_24_payouts, post_24_orders,
             pre_25_sales, pre_25_payouts, pre_25_orders, post_25_sales, post_25_payouts, post_25_orders)
@@ -153,12 +136,6 @@ def load_and_aggregate_dd_data(excluded_dates=None, pre_start_date=None, pre_end
         return (pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame(),
                 pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame())
     
-    # Debug: Show file info
-    st.info(f"🔍 DEBUG: Loading DoorDash data from: {dd_data_path}")
-    st.info(f"🔍 DEBUG: File exists: {dd_data_path.exists()}")
-    st.info(f"🔍 DEBUG: File absolute path: {dd_data_path.resolve()}")
-    st.info(f"🔍 DEBUG: File size: {dd_data_path.stat().st_size / 1024 / 1024:.2f} MB" if dd_data_path.exists() else "File not found")
-    
     # Use master file dd-data.csv
     # For LastYear_Pre_vs_Post: pre24 = last year's pre dates, post24 = last year's post dates
     # For current year: pre25 = current pre dates, post25 = current post dates
@@ -167,36 +144,25 @@ def load_and_aggregate_dd_data(excluded_dates=None, pre_start_date=None, pre_end
     pre_24_start, pre_24_end = get_last_year_dates(pre_start_date, pre_end_date)
     post_24_start, post_24_end = get_last_year_dates(post_start_date, post_end_date)
     
-    st.info(f"🔍 DEBUG: Date ranges - Pre 24: {pre_24_start} to {pre_24_end}, Post 24: {post_24_start} to {post_24_end}")
-    st.info(f"🔍 DEBUG: Date ranges - Pre 25: {pre_start_date} to {pre_end_date}, Post 25: {post_start_date} to {post_end_date}")
-    
     # Process for last year's Pre period (for LastYear_Pre_vs_Post calculation)
-    st.info("🔍 DEBUG: Processing Pre 24 (last year pre)...")
     pre_24_sales, pre_24_payouts, pre_24_orders = process_master_file_for_dd(
         dd_data_path, pre_24_start, pre_24_end, excluded_dates
     )
-    st.info(f"🔍 DEBUG: Pre 24 results - Sales rows: {len(pre_24_sales)}, Payouts rows: {len(pre_24_payouts)}, Orders rows: {len(pre_24_orders)}")
     
     # Process for current year's Pre period
-    st.info("🔍 DEBUG: Processing Pre 25 (current year pre)...")
     pre_25_sales, pre_25_payouts, pre_25_orders = process_master_file_for_dd(
         dd_data_path, pre_start_date, pre_end_date, excluded_dates
     )
-    st.info(f"🔍 DEBUG: Pre 25 results - Sales rows: {len(pre_25_sales)}, Payouts rows: {len(pre_25_payouts)}, Orders rows: {len(pre_25_orders)}")
     
     # For YoY: post24 = last year's post dates, post25 = current post dates
-    st.info("🔍 DEBUG: Processing Post 24 (last year post)...")
     post_24_sales, post_24_payouts, post_24_orders = process_master_file_for_dd(
         dd_data_path, post_24_start, post_24_end, excluded_dates
     )
-    st.info(f"🔍 DEBUG: Post 24 results - Sales rows: {len(post_24_sales)}, Payouts rows: {len(post_24_payouts)}, Orders rows: {len(post_24_orders)}")
     
     # post25 = current post dates
-    st.info("🔍 DEBUG: Processing Post 25 (current year post)...")
     post_25_sales, post_25_payouts, post_25_orders = process_master_file_for_dd(
         dd_data_path, post_start_date, post_end_date, excluded_dates
     )
-    st.info(f"🔍 DEBUG: Post 25 results - Sales rows: {len(post_25_sales)}, Payouts rows: {len(post_25_payouts)}, Orders rows: {len(post_25_orders)}")
     
     return (pre_24_sales, pre_24_payouts, pre_24_orders, post_24_sales, post_24_payouts, post_24_orders,
             pre_25_sales, pre_25_payouts, pre_25_orders, post_25_sales, post_25_payouts, post_25_orders)
@@ -264,12 +230,13 @@ def load_and_aggregate_new_customers(excluded_dates=None, pre_start_date=None, p
             st.warning(f"⚠️ No MARKETING_PROMOTION*.csv files found in {marketing_folder_path}. Cannot load new customers data.")
             return pd.DataFrame()
         
-        st.info(f"🔍 DEBUG: Found {len(promotion_files)} MARKETING_PROMOTION*.csv file(s)")
+        # Debug: Show found files
+        st.info(f"✅ DEBUG 1: Found {len(promotion_files)} MARKETING_PROMOTION*.csv file(s):")
+        for pf in promotion_files:
+            st.info(f"   - {pf.name}")
         
         # Process all MARKETING_PROMOTION*.csv files
         for promotion_file in promotion_files:
-            
-            for promotion_file in promotion_files:
                 try:
                     df = pd.read_csv(promotion_file)
                     df.columns = df.columns.str.strip()
@@ -289,6 +256,14 @@ def load_and_aggregate_new_customers(excluded_dates=None, pre_start_date=None, p
                     if new_customers_col is None:
                         st.warning(f"⚠️ 'New customers acquired' column not found in {promotion_file.name}. Available columns: {list(df.columns)[:10]}")
                         continue
+                    
+                    # Debug: Show column found and sample values
+                    st.info(f"✅ DEBUG 2: 'New customers acquired' column found in {promotion_file.name} (column name: '{new_customers_col}')")
+                    sample_values = df[new_customers_col].head(10).tolist()
+                    st.info(f"✅ DEBUG 3: Sample values (first 10 rows): {sample_values}")
+                    st.info(f"   - Total rows in file: {len(df)}")
+                    st.info(f"   - Sum of 'New customers acquired': {df[new_customers_col].sum()}")
+                    st.info(f"   - Non-zero values: {(df[new_customers_col] != 0).sum()}")
                     
                     # Normalize store ID column
                     df, store_col = normalize_store_id_column(df)
@@ -310,11 +285,6 @@ def load_and_aggregate_new_customers(excluded_dates=None, pre_start_date=None, p
                         st.warning(f"⚠️ No valid dates found in {promotion_file.name}")
                         continue
                     
-                    # Debug: Show date range in file
-                    min_date = df['Date'].min().date()
-                    max_date = df['Date'].max().date()
-                    st.info(f"🔍 DEBUG: {promotion_file.name} has dates from {min_date} to {max_date} ({len(df)} rows)")
-                    
                     # Filter by date range if provided
                     if start_date and end_date:
                         # Parse start and end dates
@@ -328,12 +298,8 @@ def load_and_aggregate_new_customers(excluded_dates=None, pre_start_date=None, p
                         else:
                             end_dt = pd.to_datetime(end_date)
                         
-                        st.info(f"🔍 DEBUG: Filtering for date range: {start_dt.date()} to {end_dt.date()}")
-                        
                         date_mask = (df['Date'] >= start_dt) & (df['Date'] <= end_dt)
                         df = df[date_mask]
-                        
-                        st.info(f"🔍 DEBUG: After date filtering: {len(df)} rows")
                     
                     # Apply excluded dates filter
                     if excluded_dates and not df.empty:
@@ -386,10 +352,6 @@ def load_and_aggregate_new_customers(excluded_dates=None, pre_start_date=None, p
         # Convert Store ID to string to match other dataframes
         new_customers_agg['Store ID'] = new_customers_agg['Store ID'].astype(str)
         
-        # Debug: Show aggregation results
-        total_new_customers = new_customers_agg['New Customers'].sum()
-        st.success(f"✅ DEBUG: Aggregated {total_new_customers} new customers from {len(new_customers_agg)} stores for date range {start_date} to {end_date}")
-        
         return new_customers_agg
     
     # Process DoorDash new customers from marketing_promotion files for each period
@@ -433,13 +395,8 @@ def load_and_aggregate_new_customers(excluded_dates=None, pre_start_date=None, p
         total_post_24 = dd_post_24_nc['New Customers'].sum() if not dd_post_24_nc.empty else 0
         total_post_25 = dd_post_25_nc['New Customers'].sum() if not dd_post_25_nc.empty else 0
         
-        st.info(f"🔍 DEBUG: New Customers Summary - Pre 24: {total_pre_24}, Pre 25: {total_pre_25}, Post 24: {total_post_24}, Post 25: {total_post_25}")
-        
         if total_pre_24 + total_pre_25 + total_post_24 + total_post_25 == 0:
             st.warning(f"⚠️ No new customers data found in marketing promotion files for the specified date ranges.")
-            st.info(f"ℹ️ Please verify that marketing folder contains MARKETING_PROMOTION*.csv files with 'New customers acquired' column and 'Date' column.")
-            st.info(f"ℹ️ Marketing folder path: {marketing_folder_path}")
-            st.info(f"ℹ️ Date ranges - Pre 24: {pre_24_start} to {pre_24_end}, Pre 25: {pre_start_date} to {pre_end_date}, Post 24: {post_24_start} to {post_24_end}, Post 25: {post_start_date} to {post_end_date}")
     
     # Legacy support: If no marketing folder provided, try to use old file paths
     def process_dd_mkt_file(file_path, excluded_dates=None):
