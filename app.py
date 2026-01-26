@@ -46,16 +46,32 @@ st.markdown("""
         border-right: 1px solid var(--border-color, rgba(250, 250, 250, 0.2));
     }
     
-    /* Button styling */
+    /* Button styling - Theme-aware */
     .stButton > button {
         border-radius: 8px;
         font-weight: 600;
         transition: all 0.3s;
         background-color: var(--primary-color);
         color: white;
+        border: none;
     }
     
     .stButton > button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        opacity: 0.9;
+    }
+    
+    .stDownloadButton > button {
+        border-radius: 8px;
+        font-weight: 600;
+        transition: all 0.3s;
+        background-color: var(--primary-color);
+        color: white;
+        border: none;
+    }
+    
+    .stDownloadButton > button:hover {
         transform: translateY(-2px);
         box-shadow: 0 4px 12px rgba(0,0,0,0.15);
         opacity: 0.9;
@@ -495,15 +511,26 @@ def main():
     if export_clicked:
         try:
             with st.spinner("🔄 Exporting all tables to Excel..."):
-                filepath = export_to_excel(
+                file_bytes, filename = export_to_excel(
                     dd_table1, dd_table2, ue_table1, ue_table2,
                     dd_sales_df, dd_payouts_df, dd_orders_df, dd_new_customers_df,
                     ue_sales_df, ue_payouts_df, ue_orders_df, ue_new_customers_df,
                     st.session_state.get("selected_stores_DoorDash", []),
                     st.session_state.get("selected_stores_UberEats", []),
-                    combined_summary1, combined_summary2, combined_store_table1, combined_store_table2
+                    combined_summary1, combined_summary2, combined_store_table1, combined_store_table2,
+                    corporate_todc_table=corporate_todc_table,
+                    promotion_table=promotion_table,
+                    sponsored_table=sponsored_table
                 )
-                st.success(f"✅ **Export successful!** Excel file saved to: `{filepath}`")
+                st.success(f"✅ **Export successful!** Click the button below to download the file.")
+                st.download_button(
+                    label="📥 Download Excel File",
+                    data=file_bytes,
+                    file_name=filename,
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    type="primary",
+                    use_container_width=True
+                )
         except Exception as e:
             st.error(f"❌ **Export failed!** Error: {str(e)}")
             import traceback

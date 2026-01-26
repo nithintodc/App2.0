@@ -16,10 +16,13 @@ def export_to_excel(dd_table1, dd_table2, ue_table1, ue_table2,
                      dd_sales_df, dd_payouts_df, dd_orders_df, dd_new_customers_df,
                      ue_sales_df, ue_payouts_df, ue_orders_df, ue_new_customers_df,
                      dd_selected_stores, ue_selected_stores,
-                     combined_summary1, combined_summary2, combined_store_table1, combined_store_table2):
-    """Export all tables to an Excel file with 2 sheets: Summary Tables and Store-Level Tables"""
-    # Create outputs folder if it doesn't exist
-    outputs_dir = ROOT_DIR / "outputs"
+                     combined_summary1, combined_summary2, combined_store_table1, combined_store_table2,
+                     corporate_todc_table=None, promotion_table=None, sponsored_table=None):
+    """Export all tables to an Excel file with sheets: Summary Tables, Store-Level Tables, and Corporate vs TODC"""
+    # Use temp directory for file creation (will be downloaded, not saved to disk)
+    import tempfile
+    temp_dir = Path(tempfile.gettempdir())
+    outputs_dir = temp_dir / "streamlit_exports"
     outputs_dir.mkdir(exist_ok=True)
     
     # Create workbook
@@ -47,11 +50,11 @@ def export_to_excel(dd_table1, dd_table2, ue_table1, ue_table2,
         ws.cell(row=start_row, column=1).font = Font(bold=True, size=12)
         start_row += 1
         # Add table data
-        # Check if Store ID or Metric is in index
-        if df.index.name in ['Store ID', 'Metric'] or (hasattr(df.index, 'name') and df.index.name):
+        # Check if Store ID, Metric, or Is Self Serve Campaign is in index
+        if df.index.name in ['Store ID', 'Metric', 'Is Self Serve Campaign'] or (hasattr(df.index, 'name') and df.index.name):
             # Reset index to include it as a column
             df_display = df.reset_index()
-        elif 'Store ID' not in df.columns and 'Metric' not in df.columns:
+        elif 'Store ID' not in df.columns and 'Metric' not in df.columns and 'Is Self Serve Campaign' not in df.columns:
             # Try to reset index if it exists
             try:
                 df_display = df.reset_index()
@@ -90,9 +93,21 @@ def export_to_excel(dd_table1, dd_table2, ue_table1, ue_table2,
                     # Format as percentage with % symbol
                     if isinstance(value, (int, float)):
                         cell.value = f"{value:.1f}%"
-                elif col_name in ['Store ID', 'Metric']:
+                elif col_name in ['Store ID', 'Metric', 'Is Self Serve Campaign']:
                     # Keep as is (text)
                     pass
+                elif col_name == 'Orders':
+                    # Orders: format as integer with comma separators
+                    if isinstance(value, (int, float)):
+                        cell.value = f"{int(round(value)):,}"
+                elif col_name in ['Sales', 'Spend', 'Cost per Order']:
+                    # Sales, Spend, Cost per Order: format as dollar amount
+                    if isinstance(value, (int, float)):
+                        cell.value = f"${value:,.2f}"
+                elif col_name == 'ROAS':
+                    # ROAS: format as decimal
+                    if isinstance(value, (int, float)):
+                        cell.value = f"{value:.2f}"
                 elif is_orders_row or is_new_customers_row:
                     # Orders and New Customers rows: format as integer with comma separators (no decimals, no dollar sign)
                     if isinstance(value, (int, float)):
@@ -166,6 +181,45 @@ def export_to_excel(dd_table1, dd_table2, ue_table1, ue_table2,
     if ue_table2 is not None:
         current_row = add_table_to_sheet(ws_store, "UberEats Table 2: Year-over-Year Analysis (Store-Level)", ue_table2, current_row)
     
+    # Sheet 3: Corporate vs TODC Tables
+    if corporate_todc_table is not None and not corporate_todc_table.empty:
+        ws_corporate = wb.create_sheet("Corporate vs TODC")
+        current_row = 1
+        
+        # Add Combined Corporate vs TODC table
+        # Prepare the table for export (reset index to include Is Self Serve Campaign as column)
+        corporate_export = corporate_todc_table.copy()
+        corporate_export.index.name = 'Is Self Serve Campaign'
+        corporate_export = corporate_export.reset_index()
+        corporate_export['Is Self Serve Campaign'] = corporate_export['Is Self Serve Campaign'].apply(
+            lambda x: 'Corporate' if x == False else ('TODC' if x == True else str(x))
+        )
+        corporate_export = corporate_export.set_index('Is Self Serve Campaign')
+        
+        current_row = add_table_to_sheet(ws_corporate, "Combined: Corporate vs TODC", corporate_export, current_row)
+        
+        # Add Promotion table if available
+        if promotion_table is not None and not promotion_table.empty:
+            promo_export = promotion_table.copy()
+            promo_export.index.name = 'Is Self Serve Campaign'
+            promo_export = promo_export.reset_index()
+            promo_export['Is Self Serve Campaign'] = promo_export['Is Self Serve Campaign'].apply(
+                lambda x: 'Corporate' if x == False else ('TODC' if x == True else str(x))
+            )
+            promo_export = promo_export.set_index('Is Self Serve Campaign')
+            current_row = add_table_to_sheet(ws_corporate, "Promotion: Corporate vs TODC", promo_export, current_row)
+        
+        # Add Sponsored Listing table if available
+        if sponsored_table is not None and not sponsored_table.empty:
+            sponsored_export = sponsored_table.copy()
+            sponsored_export.index.name = 'Is Self Serve Campaign'
+            sponsored_export = sponsored_export.reset_index()
+            sponsored_export['Is Self Serve Campaign'] = sponsored_export['Is Self Serve Campaign'].apply(
+                lambda x: 'Corporate' if x == False else ('TODC' if x == True else str(x))
+            )
+            sponsored_export = sponsored_export.set_index('Is Self Serve Campaign')
+            current_row = add_table_to_sheet(ws_corporate, "Sponsored Listing: Corporate vs TODC", sponsored_export, current_row)
+    
     # Generate filename with timestamp
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     filename = f"analysis_export_{timestamp}.xlsx"
@@ -173,6 +227,10 @@ def export_to_excel(dd_table1, dd_table2, ue_table1, ue_table2,
     
     # Save workbook
     wb.save(filepath)
+    
+    # Read file as bytes for download
+    with open(filepath, 'rb') as f:
+        file_bytes = f.read()
     
     # Upload to Google Drive in "cloud-app-uploads" folder
     try:
@@ -185,14 +243,13 @@ def export_to_excel(dd_table1, dd_table2, ue_table1, ue_table2,
                 subfolder_name="outputs",
                 file_name=filename
             )
-            st.success(f"✅ **Export successful!** Excel file saved locally and uploaded to Google Drive.")
+            st.success(f"✅ **Export successful!** Excel file ready for download and uploaded to Google Drive.")
             st.info(f"📤 File uploaded to Google Drive: [{upload_result['file_name']}]({upload_result['webViewLink']})")
-            st.info(f"📁 Local file saved to: `{filepath}`")
     except Exception as e:
-        st.warning(f"⚠️ Local file saved, but Google Drive upload failed: {str(e)}")
-        st.info(f"📁 Local file saved to: `{filepath}`")
+        st.warning(f"⚠️ Google Drive upload failed: {str(e)}")
     
-    return filepath
+    # Return file bytes and filename for download
+    return file_bytes, filename
 
 
 def create_date_export(dd_pre_24_path, dd_post_24_path, dd_pre_25_path, dd_post_25_path,
