@@ -86,24 +86,24 @@ def extract_file_info(file_path, file_type):
 
 def display_file_upload_screen():
     """Display the file upload screen (Screen 1)"""
-    # Custom CSS for SaaS-like styling
+    # Custom CSS for SaaS-like styling - Theme-aware
     st.markdown("""
     <style>
     .main-header {
         font-size: 2.5rem;
         font-weight: 700;
-        color: #1f2937;
+        color: var(--text-color);
         margin-bottom: 0.5rem;
     }
     .section-header {
         font-size: 1.5rem;
         font-weight: 600;
-        color: #374151;
+        color: var(--text-color);
         margin-top: 2rem;
         margin-bottom: 1rem;
     }
     .info-box {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        background: linear-gradient(135deg, var(--primary-color) 0%, #764ba2 100%);
         padding: 1.5rem;
         border-radius: 12px;
         color: white;
@@ -117,26 +117,29 @@ def display_file_upload_screen():
         margin: 0.5rem 0;
     }
     .file-info-card {
-        background: #f9fafb;
-        border: 1px solid #e5e7eb;
+        background: var(--secondary-background-color);
+        border: 1px solid var(--border-color, rgba(250, 250, 250, 0.2));
         border-radius: 8px;
         padding: 1rem;
         margin: 0.5rem 0;
+        color: var(--text-color);
     }
     .metric-box {
-        background: white;
-        border: 1px solid #e5e7eb;
+        background: var(--secondary-background-color);
+        border: 1px solid var(--border-color, rgba(250, 250, 250, 0.2));
         border-radius: 8px;
         padding: 1rem;
         text-align: center;
         box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        color: var(--text-color);
     }
     .date-range-display {
-        background: #eff6ff;
-        border-left: 4px solid #3b82f6;
+        background: var(--secondary-background-color);
+        border-left: 4px solid var(--primary-color);
         padding: 1rem;
         border-radius: 4px;
         margin: 0.5rem 0;
+        color: var(--text-color);
     }
     </style>
     """, unsafe_allow_html=True)

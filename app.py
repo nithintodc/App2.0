@@ -26,7 +26,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Global CSS for SaaS-like styling
+# Global CSS for SaaS-like styling - Theme-aware
 st.markdown("""
 <style>
     /* Hide Streamlit branding */
@@ -34,15 +34,16 @@ st.markdown("""
     footer {visibility: hidden;}
     header {visibility: hidden;}
     
-    /* Custom styling */
+    /* Custom styling - Theme-aware */
     .stApp {
-        background: #f8fafc;
+        background: var(--background-color);
+        color: var(--text-color);
     }
     
-    /* Sidebar styling */
-    .css-1d391kg {
-        background: white;
-        border-right: 1px solid #e5e7eb;
+    /* Sidebar styling - Theme-aware */
+    [data-testid="stSidebar"] {
+        background: var(--secondary-background-color);
+        border-right: 1px solid var(--border-color, rgba(250, 250, 250, 0.2));
     }
     
     /* Button styling */
@@ -50,16 +51,32 @@ st.markdown("""
         border-radius: 8px;
         font-weight: 600;
         transition: all 0.3s;
+        background-color: var(--primary-color);
+        color: white;
     }
     
     .stButton > button:hover {
         transform: translateY(-2px);
         box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        opacity: 0.9;
     }
     
     /* File uploader styling */
     .uploadedFile {
         border-radius: 8px;
+        background: var(--secondary-background-color);
+    }
+    
+    /* Text input styling */
+    .stTextInput > div > div > input {
+        background-color: var(--secondary-background-color);
+        color: var(--text-color);
+    }
+    
+    /* Selectbox styling */
+    .stSelectbox > div > div {
+        background-color: var(--secondary-background-color);
+        color: var(--text-color);
     }
 </style>
 """, unsafe_allow_html=True)
@@ -97,15 +114,17 @@ def main():
             margin: 0.5rem 0;
             border-radius: 8px;
             border: none;
-            background: #f3f4f6;
+            background: var(--secondary-background-color);
             cursor: pointer;
             transition: all 0.3s;
+            color: var(--text-color);
         }
         .nav-button:hover {
-            background: #e5e7eb;
+            background: var(--background-color);
+            opacity: 0.8;
         }
         .nav-button.active {
-            background: #3b82f6;
+            background: var(--primary-color);
             color: white;
         }
         </style>

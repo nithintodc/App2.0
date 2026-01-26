@@ -1,6 +1,8 @@
 [theme]
-base = "dark"
-primaryColor = "#1f77b4"
-backgroundColor = "#0e1117"
-secondaryBackgroundColor = "#262730"
-textColor = "#fafafa"
+# Theme will adapt based on user's system preference or can be set to "light" or "dark"
+# For production, you can set base = "light" if you want light mode by default
+base = "light"
+primaryColor = "#3b82f6"
+backgroundColor = "#ffffff"
+secondaryBackgroundColor = "#f0f2f6"
+textColor = "#262730"
