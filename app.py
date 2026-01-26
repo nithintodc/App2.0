@@ -18,7 +18,7 @@ from ui_components import create_store_selector, display_store_tables, display_s
 from export_functions import export_to_excel, create_date_export
 from file_upload_screen import display_file_upload_screen
 
-# Set page config
+# Set page config - Ensure sidebar is expanded by default
 st.set_page_config(
     page_title="Delivery Platform Data Analysis",
     page_icon="📊",
@@ -29,10 +29,20 @@ st.set_page_config(
 # Global CSS for SaaS-like styling - Theme-aware
 st.markdown("""
 <style>
-    /* Hide Streamlit branding */
+    /* Hide Streamlit branding but keep sidebar toggle */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
-    header {visibility: hidden;}
+    /* Don't hide header completely - it contains the sidebar toggle button */
+    header {visibility: visible !important;}
+    
+    /* Ensure sidebar toggle button is visible */
+    header button[kind="header"],
+    header [data-testid="stHeader"] button,
+    button[kind="header"] {
+        visibility: visible !important;
+        display: inline-block !important;
+        z-index: 1000 !important;
+    }
     
     /* Custom styling - Theme-aware */
     .stApp {
@@ -40,10 +50,40 @@ st.markdown("""
         color: var(--text-color);
     }
     
-    /* Sidebar styling - Theme-aware */
-    [data-testid="stSidebar"] {
-        background: var(--secondary-background-color);
-        border-right: 1px solid var(--border-color, rgba(250, 250, 250, 0.2));
+    /* Sidebar styling - Theme-aware - Ensure visibility in production */
+    section[data-testid="stSidebar"] {
+        background: var(--secondary-background-color) !important;
+        border-right: 1px solid rgba(0, 0, 0, 0.1) !important;
+        visibility: visible !important;
+    }
+    
+    /* Sidebar content container */
+    section[data-testid="stSidebar"] > div {
+        visibility: visible !important;
+    }
+    
+    /* Sidebar navigation elements */
+    section[data-testid="stSidebar"] .css-1d391kg,
+    section[data-testid="stSidebar"] .css-1lcbmhc {
+        visibility: visible !important;
+    }
+    
+    /* Ensure sidebar is not hidden by any CSS */
+    section[data-testid="stSidebar"][aria-expanded="true"] {
+        display: block !important;
+        visibility: visible !important;
+    }
+    
+    /* Sidebar when collapsed - still ensure toggle is visible */
+    section[data-testid="stSidebar"][aria-expanded="false"] {
+        display: none !important;
+    }
+    
+    /* Sidebar toggle button - ensure it's always visible */
+    button[kind="header"][data-testid="baseButton-header"] {
+        visibility: visible !important;
+        display: inline-block !important;
+        z-index: 1000 !important;
     }
     
     /* Button styling - Dark text on light background for visibility */
