@@ -103,10 +103,11 @@ def display_file_upload_screen():
         margin-bottom: 1rem;
     }
     .info-box {
-        background: linear-gradient(135deg, var(--primary-color) 0%, #764ba2 100%);
+        background: var(--secondary-background-color);
+        border: 2px solid var(--primary-color);
         padding: 1.5rem;
         border-radius: 12px;
-        color: white;
+        color: var(--text-color);
         margin: 1rem 0;
     }
     .success-box {
@@ -278,11 +279,11 @@ def display_file_upload_screen():
         st.markdown("---")
         st.markdown(f"""
         <div class="info-box">
-            <h3 style="margin-top:0;">📥 Recommended Data Download Range</h3>
-            <p style="font-size:1.2rem; margin-bottom:0.5rem;">
-                <strong>{suggested_start.strftime('%m/%d/%Y')} - {suggested_end.strftime('%m/%d/%Y')}</strong>
+            <h3 style="margin-top:0; color: var(--text-color);">📥 Recommended Data Download Range</h3>
+            <p style="font-size:1.2rem; margin-bottom:0.5rem; color: var(--text-color);">
+                <strong style="color: var(--text-color);">{suggested_start.strftime('%m/%d/%Y')} - {suggested_end.strftime('%m/%d/%Y')}</strong>
             </p>
-            <p style="margin-bottom:0;">Total: {suggested_days} days | Download data from DoorDash (DD) and UberEats (UE) for this range</p>
+            <p style="margin-bottom:0; color: var(--text-color);">Total: {suggested_days} days | Download data from DoorDash (DD) and UberEats (UE) for this range</p>
         </div>
         """, unsafe_allow_html=True)
     
