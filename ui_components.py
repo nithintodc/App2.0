@@ -66,15 +66,15 @@ def display_store_tables(platform_name, table1_df, table2_df):
     
     st.subheader(f"Table 1: Current Year Pre vs Post Analysis")
     table1_display = table1_df.copy()
-    # Filter out rows with no data (both pre25 and post25 are 0 or NaN)
-    if 'pre25' in table1_display.columns and 'post25' in table1_display.columns:
+    # Filter out rows with no data (both Pre and Post are 0 or NaN)
+    if 'Pre' in table1_display.columns and 'Post' in table1_display.columns:
         table1_display = table1_display[
-            (table1_display['pre25'].fillna(0) != 0) | (table1_display['post25'].fillna(0) != 0)
+            (table1_display['Pre'].fillna(0) != 0) | (table1_display['Post'].fillna(0) != 0)
         ]
     
     if not table1_display.empty:
-        table1_display['pre25'] = table1_display['pre25'].apply(lambda x: f"${x:,.1f}")
-        table1_display['post25'] = table1_display['post25'].apply(lambda x: f"${x:,.1f}")
+        table1_display['Pre'] = table1_display['Pre'].apply(lambda x: f"${x:,.1f}")
+        table1_display['Post'] = table1_display['Post'].apply(lambda x: f"${x:,.1f}")
         table1_display['PrevsPost'] = table1_display['PrevsPost'].apply(lambda x: f"${x:,.1f}")
         table1_display['LastYear Pre vs Post'] = table1_display['LastYear Pre vs Post'].apply(lambda x: f"${x:,.1f}")
         table1_display['Growth%'] = table1_display['Growth%'].apply(lambda x: f"{x:.1f}%")
@@ -99,14 +99,14 @@ def display_summary_tables(platform_name, summary_table1, summary_table2):
         metric = idx
         if metric == 'Orders' or metric == 'New Customers':
             # Orders: format as integer string
-            summary_table1_display.loc[idx, 'Pre25'] = f"{int(round(summary_table1.loc[idx, 'Pre25'])):,}"
-            summary_table1_display.loc[idx, 'Post25'] = f"{int(round(summary_table1.loc[idx, 'Post25'])):,}"
+            summary_table1_display.loc[idx, 'Pre'] = f"{int(round(summary_table1.loc[idx, 'Pre'])):,}"
+            summary_table1_display.loc[idx, 'Post'] = f"{int(round(summary_table1.loc[idx, 'Post'])):,}"
             summary_table1_display.loc[idx, 'PrevsPost'] = f"{int(round(summary_table1.loc[idx, 'PrevsPost'])):,}"
             summary_table1_display.loc[idx, 'LastYear Pre vs Post'] = f"{int(round(summary_table1.loc[idx, 'LastYear Pre vs Post'])):,}"
         else:
             # Sales/Payouts: format as dollars
-            summary_table1_display.loc[idx, 'Pre25'] = f"${summary_table1.loc[idx, 'Pre25']:,.1f}"
-            summary_table1_display.loc[idx, 'Post25'] = f"${summary_table1.loc[idx, 'Post25']:,.1f}"
+            summary_table1_display.loc[idx, 'Pre'] = f"${summary_table1.loc[idx, 'Pre']:,.1f}"
+            summary_table1_display.loc[idx, 'Post'] = f"${summary_table1.loc[idx, 'Post']:,.1f}"
             summary_table1_display.loc[idx, 'PrevsPost'] = f"${summary_table1.loc[idx, 'PrevsPost']:,.1f}"
             summary_table1_display.loc[idx, 'LastYear Pre vs Post'] = f"${summary_table1.loc[idx, 'LastYear Pre vs Post']:,.1f}"
         # Growth% is always a percentage
@@ -129,13 +129,13 @@ def display_summary_tables(platform_name, summary_table1, summary_table2):
         metric = idx
         if metric == 'Orders' or metric == 'New Customers':
             # Orders: format as integer string
-            summary_table2_display.loc[idx, 'Post24'] = f"{int(round(summary_table2.loc[idx, 'Post24'])):,}"
-            summary_table2_display.loc[idx, 'Post25'] = f"{int(round(summary_table2.loc[idx, 'Post25'])):,}"
+            summary_table2_display.loc[idx, 'last year-post'] = f"{int(round(summary_table2.loc[idx, 'last year-post'])):,}"
+            summary_table2_display.loc[idx, 'post'] = f"{int(round(summary_table2.loc[idx, 'post'])):,}"
             summary_table2_display.loc[idx, 'YoY'] = f"{int(round(summary_table2.loc[idx, 'YoY'])):,}"
         else:
             # Sales/Payouts: format as dollars
-            summary_table2_display.loc[idx, 'Post24'] = f"${summary_table2.loc[idx, 'Post24']:,.1f}"
-            summary_table2_display.loc[idx, 'Post25'] = f"${summary_table2.loc[idx, 'Post25']:,.1f}"
+            summary_table2_display.loc[idx, 'last year-post'] = f"${summary_table2.loc[idx, 'last year-post']:,.1f}"
+            summary_table2_display.loc[idx, 'post'] = f"${summary_table2.loc[idx, 'post']:,.1f}"
             summary_table2_display.loc[idx, 'YoY'] = f"${summary_table2.loc[idx, 'YoY']:,.1f}"
         # YoY% is always a percentage
         summary_table2_display.loc[idx, 'YoY%'] = f"{summary_table2.loc[idx, 'YoY%']:.1f}%"
@@ -170,8 +170,8 @@ def display_platform_data(platform_name, sales_df, payouts_df, sales_label, plat
     
     # Format and display Summary Table 1
     summary_table1_display = summary_table1.copy()
-    summary_table1_display['Pre25'] = summary_table1_display['Pre25'].apply(lambda x: f"${x:,.1f}")
-    summary_table1_display['Post25'] = summary_table1_display['Post25'].apply(lambda x: f"${x:,.1f}")
+    summary_table1_display['Pre'] = summary_table1_display['Pre'].apply(lambda x: f"${x:,.1f}")
+    summary_table1_display['Post'] = summary_table1_display['Post'].apply(lambda x: f"${x:,.1f}")
     summary_table1_display['PrevsPost'] = summary_table1_display['PrevsPost'].apply(lambda x: f"${x:,.1f}")
     summary_table1_display['LastYear Pre vs Post'] = summary_table1_display['LastYear Pre vs Post'].apply(lambda x: f"${x:,.1f}")
     summary_table1_display['Growth%'] = summary_table1_display['Growth%'].apply(lambda x: f"{x:.1f}%")
@@ -181,8 +181,8 @@ def display_platform_data(platform_name, sales_df, payouts_df, sales_label, plat
     
     # Format and display Summary Table 2
     summary_table2_display = summary_table2.copy()
-    summary_table2_display['Post24'] = summary_table2_display['Post24'].apply(lambda x: f"${x:,.1f}")
-    summary_table2_display['Post25'] = summary_table2_display['Post25'].apply(lambda x: f"${x:,.1f}")
+    summary_table2_display['last year-post'] = summary_table2_display['last year-post'].apply(lambda x: f"${x:,.1f}")
+    summary_table2_display['post'] = summary_table2_display['post'].apply(lambda x: f"${x:,.1f}")
     summary_table2_display['YoY'] = summary_table2_display['YoY'].apply(lambda x: f"${x:,.1f}")
     summary_table2_display['YoY%'] = summary_table2_display['YoY%'].apply(lambda x: f"{x:.1f}%")
     
@@ -192,13 +192,13 @@ def display_platform_data(platform_name, sales_df, payouts_df, sales_label, plat
     st.divider()
     st.subheader("🏪 Store-Level Analysis")
     
-    # First Table: Store ID, pre25, post25, PrevsPost, LastYear Pre vs Post, Growth%
+    # First Table: Store ID, Pre, Post, PrevsPost, LastYear Pre vs Post, Growth%
     st.subheader("Table 1: Current Year Pre vs Post Analysis")
     # Create table for CSV (keep numeric values)
     table1_df = filtered_sales_df[['Store ID', 'pre_25', 'post_25', 'PrevsPost', 'LastYear_Pre_vs_Post', 'Growth%']].copy()
     table1_df = table1_df.rename(columns={
-        'pre_25': 'pre25',
-        'post_25': 'post25',
+        'pre_25': 'Pre',
+        'post_25': 'Post',
         'PrevsPost': 'PrevsPost',
         'LastYear_Pre_vs_Post': 'LastYear Pre vs Post',
         'Growth%': 'Growth%'
@@ -206,8 +206,8 @@ def display_platform_data(platform_name, sales_df, payouts_df, sales_label, plat
     # Create display version with dollar and % formatting
     table1_display = table1_df.copy()
     # Format dollar columns
-    table1_display['pre25'] = table1_display['pre25'].apply(lambda x: f"${x:,.1f}")
-    table1_display['post25'] = table1_display['post25'].apply(lambda x: f"${x:,.1f}")
+    table1_display['Pre'] = table1_display['Pre'].apply(lambda x: f"${x:,.1f}")
+    table1_display['Post'] = table1_display['Post'].apply(lambda x: f"${x:,.1f}")
     table1_display['PrevsPost'] = table1_display['PrevsPost'].apply(lambda x: f"${x:,.1f}")
     table1_display['LastYear Pre vs Post'] = table1_display['LastYear Pre vs Post'].apply(lambda x: f"${x:,.1f}")
     # Format percentage column
@@ -219,21 +219,21 @@ def display_platform_data(platform_name, sales_df, payouts_df, sales_label, plat
         height=400
     )
     
-    # Second Table: Store ID, post24, post25, YoY, YoY%
+    # Second Table: Store ID, last year-post, post, YoY, YoY%
     st.subheader("Table 2: Year-over-Year Analysis")
     # Create table for CSV (keep numeric values)
     table2_df = filtered_sales_df[['Store ID', 'post_24', 'post_25', 'YoY', 'YoY%']].copy()
     table2_df = table2_df.rename(columns={
-        'post_24': 'post24',
-        'post_25': 'post25',
+        'post_24': 'last year-post',
+        'post_25': 'post',
         'YoY': 'YoY',
         'YoY%': 'YoY%'
     })
     # Create display version with dollar and % formatting
     table2_display = table2_df.copy()
     # Format dollar columns
-    table2_display['post24'] = table2_display['post24'].apply(lambda x: f"${x:,.1f}")
-    table2_display['post25'] = table2_display['post25'].apply(lambda x: f"${x:,.1f}")
+    table2_display['last year-post'] = table2_display['last year-post'].apply(lambda x: f"${x:,.1f}")
+    table2_display['post'] = table2_display['post'].apply(lambda x: f"${x:,.1f}")
     table2_display['YoY'] = table2_display['YoY'].apply(lambda x: f"${x:,.1f}")
     # Format percentage column
     table2_display['YoY%'] = table2_display['YoY%'].apply(lambda x: f"{x:.1f}%")

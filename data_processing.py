@@ -1,6 +1,7 @@
 """Data processing functions for aggregating and processing data"""
 import pandas as pd
 import streamlit as st
+from pathlib import Path
 from config import (
     DD_DATA_MASTER, UE_DATA_MASTER,
     DD_MKT_PRE_24, DD_MKT_POST_24, DD_MKT_PRE_25, DD_MKT_POST_25,
@@ -8,6 +9,35 @@ from config import (
 )
 from data_loading import process_master_file_for_dd, process_master_file_for_ue
 from utils import normalize_store_id_column, filter_excluded_dates
+
+
+def get_last_year_dates(start_date, end_date):
+    """
+    Calculate last year's date range from current date range.
+    
+    Args:
+        start_date: Start date string (MM/DD/YYYY format) or date object
+        end_date: End date string (MM/DD/YYYY format) or date object
+    
+    Returns:
+        Tuple of (last_year_start, last_year_end) as strings in MM/DD/YYYY format
+    """
+    if isinstance(start_date, str):
+        start_dt = pd.to_datetime(start_date, format='%m/%d/%Y')
+    else:
+        start_dt = pd.to_datetime(start_date)
+    
+    if isinstance(end_date, str):
+        end_dt = pd.to_datetime(end_date, format='%m/%d/%Y')
+    else:
+        end_dt = pd.to_datetime(end_date)
+    
+    # Subtract one year using DateOffset (handles leap years correctly)
+    last_year_start = start_dt - pd.DateOffset(years=1)
+    last_year_end = end_dt - pd.DateOffset(years=1)
+    
+    # Format as MM/DD/YYYY
+    return last_year_start.strftime('%m/%d/%Y'), last_year_end.strftime('%m/%d/%Y')
 
 
 def load_and_aggregate_ue_data(excluded_dates=None, pre_start_date=None, pre_end_date=None, post_start_date=None, post_end_date=None, ue_data_path=None):
@@ -43,21 +73,32 @@ def load_and_aggregate_ue_data(excluded_dates=None, pre_start_date=None, pre_end
                 pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame())
     
     # Use master file ue-data.csv
-    # Process for Pre period
+    # For LastYear_Pre_vs_Post: pre24 = last year's pre dates, post24 = last year's post dates
+    # For current year: pre25 = current pre dates, post25 = current post dates
+    
+    # Calculate last year's dates
+    pre_24_start, pre_24_end = get_last_year_dates(pre_start_date, pre_end_date)
+    post_24_start, post_24_end = get_last_year_dates(post_start_date, post_end_date)
+    
+    # Process for last year's Pre period (for LastYear_Pre_vs_Post calculation)
     pre_24_sales, pre_24_payouts, pre_24_orders = process_master_file_for_ue(
+        ue_data_path, pre_24_start, pre_24_end, excluded_dates
+    )
+    
+    # Process for current year's Pre period
+    pre_25_sales, pre_25_payouts, pre_25_orders = process_master_file_for_ue(
         ue_data_path, pre_start_date, pre_end_date, excluded_dates
     )
     
-    # Use same data for pre_25 (since we're using date ranges, not year-based)
-    pre_25_sales, pre_25_payouts, pre_25_orders = pre_24_sales.copy(), pre_24_payouts.copy(), pre_24_orders.copy()
-    
-    # Process for Post period
+    # For YoY: post24 = last year's post dates, post25 = current post dates
     post_24_sales, post_24_payouts, post_24_orders = process_master_file_for_ue(
-        ue_data_path, post_start_date, post_end_date, excluded_dates
+        ue_data_path, post_24_start, post_24_end, excluded_dates
     )
     
-    # Use same data for post_25 (since we're using date ranges, not year-based)
-    post_25_sales, post_25_payouts, post_25_orders = post_24_sales.copy(), post_24_payouts.copy(), post_24_orders.copy()
+    # post25 = current post dates
+    post_25_sales, post_25_payouts, post_25_orders = process_master_file_for_ue(
+        ue_data_path, post_start_date, post_end_date, excluded_dates
+    )
     
     return (pre_24_sales, pre_24_payouts, pre_24_orders, post_24_sales, post_24_payouts, post_24_orders,
             pre_25_sales, pre_25_payouts, pre_25_orders, post_25_sales, post_25_payouts, post_25_orders)
@@ -96,38 +137,211 @@ def load_and_aggregate_dd_data(excluded_dates=None, pre_start_date=None, pre_end
                 pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame())
     
     # Use master file dd-data.csv
-    # Process for Pre period
+    # For LastYear_Pre_vs_Post: pre24 = last year's pre dates, post24 = last year's post dates
+    # For current year: pre25 = current pre dates, post25 = current post dates
+    
+    # Calculate last year's dates
+    pre_24_start, pre_24_end = get_last_year_dates(pre_start_date, pre_end_date)
+    post_24_start, post_24_end = get_last_year_dates(post_start_date, post_end_date)
+    
+    # Process for last year's Pre period (for LastYear_Pre_vs_Post calculation)
     pre_24_sales, pre_24_payouts, pre_24_orders = process_master_file_for_dd(
+        dd_data_path, pre_24_start, pre_24_end, excluded_dates
+    )
+    
+    # Process for current year's Pre period
+    pre_25_sales, pre_25_payouts, pre_25_orders = process_master_file_for_dd(
         dd_data_path, pre_start_date, pre_end_date, excluded_dates
     )
     
-    # Use same data for pre_25 (since we're using date ranges, not year-based)
-    pre_25_sales, pre_25_payouts, pre_25_orders = pre_24_sales.copy(), pre_24_payouts.copy(), pre_24_orders.copy()
-    
-    # Process for Post period
+    # For YoY: post24 = last year's post dates, post25 = current post dates
     post_24_sales, post_24_payouts, post_24_orders = process_master_file_for_dd(
-        dd_data_path, post_start_date, post_end_date, excluded_dates
+        dd_data_path, post_24_start, post_24_end, excluded_dates
     )
     
-    # Use same data for post_25 (since we're using date ranges, not year-based)
-    post_25_sales, post_25_payouts, post_25_orders = post_24_sales.copy(), post_24_payouts.copy(), post_24_orders.copy()
+    # post25 = current post dates
+    post_25_sales, post_25_payouts, post_25_orders = process_master_file_for_dd(
+        dd_data_path, post_start_date, post_end_date, excluded_dates
+    )
     
     return (pre_24_sales, pre_24_payouts, pre_24_orders, post_24_sales, post_24_payouts, post_24_orders,
             pre_25_sales, pre_25_payouts, pre_25_orders, post_25_sales, post_25_payouts, post_25_orders)
 
 
 @st.cache_data
-def load_and_aggregate_new_customers(excluded_dates=None):
+def load_and_aggregate_new_customers(excluded_dates=None, pre_start_date=None, pre_end_date=None, 
+                                     post_start_date=None, post_end_date=None, marketing_folder_path=None):
     """
-    Load all mkt files and aggregate New Customers by Store ID.
-    DD files use "New customers acquired" column, UE files use "New customers" column.
+    Load marketing_promotion* files and aggregate New Customers by Store ID for DoorDash.
+    DD files use "New customers acquired" column from marketing_promotion* files.
+    UE files use "New customers" column (legacy support).
     
     Args:
         excluded_dates: List of dates to exclude (as datetime objects or date strings in MM/DD/YYYY format)
+        pre_start_date: Start date for pre period (MM/DD/YYYY format string)
+        pre_end_date: End date for pre period (MM/DD/YYYY format string)
+        post_start_date: Start date for post period (MM/DD/YYYY format string)
+        post_end_date: End date for post period (MM/DD/YYYY format string)
+        marketing_folder_path: Path to marketing folder containing marketing_* subfolders
     """
     
+    def process_marketing_promotion_files_for_new_customers(marketing_folder_path, start_date, end_date, excluded_dates=None):
+        """
+        Process all marketing_promotion* files in marketing folder and aggregate "New customers acquired" 
+        by Store ID for the given date range.
+        
+        Args:
+            marketing_folder_path: Path to marketing folder
+            start_date: Start date for filtering (MM/DD/YYYY format string)
+            end_date: End date for filtering (MM/DD/YYYY format string)
+            excluded_dates: List of dates to exclude
+        
+        Returns:
+            DataFrame with Store ID and New Customers aggregated
+        """
+        if marketing_folder_path is None:
+            return pd.DataFrame()
+        
+        marketing_folder_path = Path(marketing_folder_path)
+        if not marketing_folder_path.exists():
+            return pd.DataFrame()
+        
+        all_data = []
+        
+        # Find all marketing_* folders
+        marketing_dirs = [d for d in marketing_folder_path.iterdir() if d.is_dir() and d.name.startswith('marketing_')]
+        
+        if not marketing_dirs:
+            return pd.DataFrame()
+        
+        # Find all MARKETING_PROMOTION*.csv files
+        for marketing_dir in marketing_dirs:
+            promotion_files = list(marketing_dir.glob("MARKETING_PROMOTION*.csv"))
+            
+            for promotion_file in promotion_files:
+                try:
+                    df = pd.read_csv(promotion_file)
+                    df.columns = df.columns.str.strip()
+                    
+                    # Check for required columns
+                    if 'Date' not in df.columns:
+                        continue
+                    
+                    if 'New customers acquired' not in df.columns:
+                        continue
+                    
+                    # Normalize store ID column
+                    df, store_col = normalize_store_id_column(df)
+                    if store_col is None or store_col not in df.columns:
+                        continue
+                    
+                    # Convert Date column to datetime
+                    df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+                    df = df.dropna(subset=['Date'])
+                    
+                    if df.empty:
+                        continue
+                    
+                    # Filter by date range if provided
+                    if start_date and end_date:
+                        start_dt = pd.to_datetime(start_date, format='%m/%d/%Y').date() if isinstance(start_date, str) else start_date
+                        end_dt = pd.to_datetime(end_date, format='%m/%d/%Y').date() if isinstance(end_date, str) else end_date
+                        if hasattr(start_dt, 'date'):
+                            start_dt = start_dt.date()
+                        if hasattr(end_dt, 'date'):
+                            end_dt = end_dt.date()
+                        
+                        date_mask = (df['Date'].dt.date >= start_dt) & (df['Date'].dt.date <= end_dt)
+                        df = df[date_mask]
+                    
+                    # Apply excluded dates filter
+                    if excluded_dates and not df.empty:
+                        df = filter_excluded_dates(df, 'Date', excluded_dates)
+                    
+                    if not df.empty:
+                        all_data.append(df)
+                        
+                except Exception as e:
+                    st.warning(f"Error processing {promotion_file.name}: {str(e)}")
+                    continue
+        
+        if not all_data:
+            return pd.DataFrame()
+        
+        # Combine all dataframes
+        combined_df = pd.concat(all_data, ignore_index=True)
+        
+        if combined_df.empty:
+            return pd.DataFrame()
+        
+        # Normalize store ID column on combined dataframe
+        combined_df, store_col = normalize_store_id_column(combined_df)
+        if store_col is None or store_col not in combined_df.columns:
+            return pd.DataFrame()
+        
+        # Convert "New customers acquired" to numeric
+        combined_df['New customers acquired'] = pd.to_numeric(combined_df['New customers acquired'], errors='coerce')
+        combined_df = combined_df.dropna(subset=[store_col, 'New customers acquired'])
+        
+        if combined_df.empty:
+            return pd.DataFrame()
+        
+        # Group by Store ID and sum New Customers
+        new_customers_agg = combined_df.groupby(store_col)['New customers acquired'].sum().reset_index()
+        new_customers_agg.columns = ['Store ID', 'New Customers']
+        
+        # Convert Store ID to string to match other dataframes
+        new_customers_agg['Store ID'] = new_customers_agg['Store ID'].astype(str)
+        
+        return new_customers_agg
+    
+    # Process DoorDash new customers from marketing_promotion files for each period
+    # For LastYear_Pre_vs_Post: pre24 = last year's pre dates, post24 = last year's post dates
+    # For current year: pre25 = current pre dates, post25 = current post dates
+    
+    dd_pre_24_nc = pd.DataFrame()
+    dd_post_24_nc = pd.DataFrame()
+    dd_pre_25_nc = pd.DataFrame()
+    dd_post_25_nc = pd.DataFrame()
+    
+    if marketing_folder_path and pre_start_date and pre_end_date and post_start_date and post_end_date:
+        # Calculate last year's dates
+        pre_24_start, pre_24_end = get_last_year_dates(pre_start_date, pre_end_date)
+        post_24_start, post_24_end = get_last_year_dates(post_start_date, post_end_date)
+        
+        # Parse dates to determine which year they belong to
+        pre_24_start_dt = pd.to_datetime(pre_24_start, format='%m/%d/%Y')
+        post_24_start_dt = pd.to_datetime(post_24_start, format='%m/%d/%Y')
+        pre_start = pd.to_datetime(pre_start_date, format='%m/%d/%Y') if isinstance(pre_start_date, str) else pre_start_date
+        post_start = pd.to_datetime(post_start_date, format='%m/%d/%Y') if isinstance(post_start_date, str) else post_start_date
+        
+        # Pre 2024: Use last year's pre dates (for LastYear_Pre_vs_Post)
+        if pre_24_start_dt.year == 2024:
+            dd_pre_24_nc = process_marketing_promotion_files_for_new_customers(
+                marketing_folder_path, pre_24_start, pre_24_end, excluded_dates
+            )
+        
+        # Pre 2025: Use current pre dates
+        if pre_start.year == 2025:
+            dd_pre_25_nc = process_marketing_promotion_files_for_new_customers(
+                marketing_folder_path, pre_start_date, pre_end_date, excluded_dates
+            )
+        
+        # Post 2024: Use last year's post dates (for LastYear_Pre_vs_Post and YoY)
+        if post_24_start_dt.year == 2024:
+            dd_post_24_nc = process_marketing_promotion_files_for_new_customers(
+                marketing_folder_path, post_24_start, post_24_end, excluded_dates
+            )
+        
+        # Post 2025: Use current post dates (for YoY)
+        if post_start.year == 2025:
+            dd_post_25_nc = process_marketing_promotion_files_for_new_customers(
+                marketing_folder_path, post_start_date, post_end_date, excluded_dates
+            )
+    
+    # Legacy support: If no marketing folder provided, try to use old file paths
     def process_dd_mkt_file(file_path, excluded_dates=None):
-        """Process a single DD mkt CSV file and return aggregated New Customers by Store ID"""
+        """Process a single DD mkt CSV file and return aggregated New Customers by Store ID (legacy)"""
         try:
             if not file_path.exists():
                 return pd.DataFrame()
@@ -145,18 +359,15 @@ def load_and_aggregate_new_customers(excluded_dates=None):
             new_customers_col = 'New customers acquired'
             
             if store_col is None or store_col not in df.columns:
-                st.warning(f"Column 'Store ID' or 'Shop ID' not found in {file_path.name}")
                 return pd.DataFrame()
             
             if new_customers_col not in df.columns:
-                st.warning(f"Column 'New customers acquired' not found in {file_path.name}")
                 return pd.DataFrame()
             
             # Convert to numeric
             df[new_customers_col] = pd.to_numeric(df[new_customers_col], errors='coerce')
             df = df.dropna(subset=[store_col])
             
-            # Filter out zero values to reduce noise, but include them in aggregation
             # Group by Store ID and sum New Customers
             new_customers_agg = df.groupby(store_col)[new_customers_col].sum().reset_index()
             new_customers_agg.columns = ['Store ID', 'New Customers']
@@ -166,10 +377,18 @@ def load_and_aggregate_new_customers(excluded_dates=None):
             
             return new_customers_agg
         except Exception as e:
-            st.error(f"Error processing {file_path.name}: {str(e)}")
-            import traceback
-            st.error(traceback.format_exc())
             return pd.DataFrame()
+    
+    # Fallback to legacy files if marketing folder not provided
+    if marketing_folder_path is None or not Path(marketing_folder_path).exists():
+        if dd_pre_24_nc.empty:
+            dd_pre_24_nc = process_dd_mkt_file(DD_MKT_PRE_24, excluded_dates)
+        if dd_post_24_nc.empty:
+            dd_post_24_nc = process_dd_mkt_file(DD_MKT_POST_24, excluded_dates)
+        if dd_pre_25_nc.empty:
+            dd_pre_25_nc = process_dd_mkt_file(DD_MKT_PRE_25, excluded_dates)
+        if dd_post_25_nc.empty:
+            dd_post_25_nc = process_dd_mkt_file(DD_MKT_POST_25, excluded_dates)
     
     def process_ue_mkt_file(file_path, excluded_dates=None):
         """Process a single UE mkt CSV file and return aggregated New Customers by Store ID
@@ -220,7 +439,7 @@ def load_and_aggregate_new_customers(excluded_dates=None):
     dd_pre_25_nc = process_dd_mkt_file(DD_MKT_PRE_25, excluded_dates)
     dd_post_25_nc = process_dd_mkt_file(DD_MKT_POST_25, excluded_dates)
     
-    # For UE, we need to get platform-level totals since there's no Store ID
+    # For UE, we need to get platform-level totals since there's no Store ID (legacy support)
     def get_ue_platform_total(file_path, excluded_dates=None):
         """Get total new customers from UE mkt file (platform level)
         Note: Date filtering is NOT applied to UE marketing files per requirements"""
@@ -243,7 +462,7 @@ def load_and_aggregate_new_customers(excluded_dates=None):
     ue_pre_25_total = get_ue_platform_total(UE_MKT_PRE_25, excluded_dates)
     ue_post_25_total = get_ue_platform_total(UE_MKT_POST_25, excluded_dates)
     
-    # Return UE totals as a tuple for platform-level aggregation
+    # Return DD new customers DataFrames and UE totals as a tuple for platform-level aggregation
     return (dd_pre_24_nc, dd_post_24_nc, dd_pre_25_nc, dd_post_25_nc,
             ue_pre_24_total, ue_post_24_total, ue_pre_25_total, ue_post_25_total)
 

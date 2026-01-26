@@ -273,9 +273,16 @@ def main():
         dd_sales_df, dd_payouts_df, dd_orders_df = process_data(dd_pre_24_sales, dd_pre_24_payouts, dd_pre_24_orders, dd_post_24_sales, dd_post_24_payouts, dd_post_24_orders,
                                                                   dd_pre_25_sales, dd_pre_25_payouts, dd_pre_25_orders, dd_post_25_sales, dd_post_25_payouts, dd_post_25_orders)
         
-        # Load New Customers data
+        # Load New Customers data - For DoorDash, aggregate from marketing_promotion* files
         (dd_pre_24_nc, dd_post_24_nc, dd_pre_25_nc, dd_post_25_nc,
-         ue_pre_24_total, ue_post_24_total, ue_pre_25_total, ue_post_25_total) = load_and_aggregate_new_customers(excluded_dates=excluded_dates)
+         ue_pre_24_total, ue_post_24_total, ue_pre_25_total, ue_post_25_total) = load_and_aggregate_new_customers(
+            excluded_dates=excluded_dates,
+            pre_start_date=pre_start,
+            pre_end_date=pre_end,
+            post_start_date=post_start,
+            post_end_date=post_end,
+            marketing_folder_path=marketing_folder_path
+        )
         dd_new_customers_df = process_new_customers_data(dd_pre_24_nc, dd_post_24_nc, dd_pre_25_nc, dd_post_25_nc, is_ue=False)
         # For UE, we'll handle platform totals in create_summary_tables
         ue_new_customers_df = pd.DataFrame(columns=['Store ID', 'pre_24', 'post_24', 'pre_25', 'post_25', 'PrevsPost', 'LastYear_Pre_vs_Post', 'YoY'])
@@ -641,17 +648,17 @@ def main():
     if combined_store_table1 is not None and not combined_store_table1.empty:
         st.subheader("Combined Table 1: Current Year Pre vs Post Analysis (Store-Level)")
         combined_store1_display = combined_store_table1.reset_index() if combined_store_table1.index.name == 'Store ID' else combined_store_table1.copy()
-        # Filter out rows with no data (both pre25 and post25 are 0 or NaN)
-        if 'pre25' in combined_store1_display.columns and 'post25' in combined_store1_display.columns:
+        # Filter out rows with no data (both Pre and Post are 0 or NaN)
+        if 'Pre' in combined_store1_display.columns and 'Post' in combined_store1_display.columns:
             combined_store1_display = combined_store1_display[
-                (combined_store1_display['pre25'].fillna(0) != 0) | (combined_store1_display['post25'].fillna(0) != 0)
+                (combined_store1_display['Pre'].fillna(0) != 0) | (combined_store1_display['Post'].fillna(0) != 0)
             ]
         # Only display if there's data after filtering
-        if not combined_store1_display.empty and 'pre25' in combined_store1_display.columns:
-            if 'pre25' in combined_store1_display.columns:
-                combined_store1_display['pre25'] = combined_store1_display['pre25'].apply(lambda x: f"${x:,.1f}" if isinstance(x, (int, float)) else x)
-            if 'post25' in combined_store1_display.columns:
-                combined_store1_display['post25'] = combined_store1_display['post25'].apply(lambda x: f"${x:,.1f}" if isinstance(x, (int, float)) else x)
+        if not combined_store1_display.empty and 'Pre' in combined_store1_display.columns:
+            if 'Pre' in combined_store1_display.columns:
+                combined_store1_display['Pre'] = combined_store1_display['Pre'].apply(lambda x: f"${x:,.1f}" if isinstance(x, (int, float)) else x)
+            if 'Post' in combined_store1_display.columns:
+                combined_store1_display['Post'] = combined_store1_display['Post'].apply(lambda x: f"${x:,.1f}" if isinstance(x, (int, float)) else x)
             if 'PrevsPost' in combined_store1_display.columns:
                 combined_store1_display['PrevsPost'] = combined_store1_display['PrevsPost'].apply(lambda x: f"${x:,.1f}" if isinstance(x, (int, float)) else x)
             if 'LastYear Pre vs Post' in combined_store1_display.columns:
@@ -696,13 +703,13 @@ def main():
         metric = idx
         if metric == 'Orders' or metric == 'New Customers':
             # Orders: format as integer string
-            combined_summary1_display.loc[idx, 'Pre25'] = f"{int(round(combined_summary1.loc[idx, 'Pre25'])):,}"
-            combined_summary1_display.loc[idx, 'Post25'] = f"{int(round(combined_summary1.loc[idx, 'Post25'])):,}"
+            combined_summary1_display.loc[idx, 'Pre'] = f"{int(round(combined_summary1.loc[idx, 'Pre'])):,}"
+            combined_summary1_display.loc[idx, 'Post'] = f"{int(round(combined_summary1.loc[idx, 'Post'])):,}"
             combined_summary1_display.loc[idx, 'PrevsPost'] = f"{int(round(combined_summary1.loc[idx, 'PrevsPost'])):,}"
             combined_summary1_display.loc[idx, 'LastYear Pre vs Post'] = f"{int(round(combined_summary1.loc[idx, 'LastYear Pre vs Post'])):,}"
         else:
-            combined_summary1_display.loc[idx, 'Pre25'] = f"${combined_summary1.loc[idx, 'Pre25']:,.1f}"
-            combined_summary1_display.loc[idx, 'Post25'] = f"${combined_summary1.loc[idx, 'Post25']:,.1f}"
+            combined_summary1_display.loc[idx, 'Pre'] = f"${combined_summary1.loc[idx, 'Pre']:,.1f}"
+            combined_summary1_display.loc[idx, 'Post'] = f"${combined_summary1.loc[idx, 'Post']:,.1f}"
             combined_summary1_display.loc[idx, 'PrevsPost'] = f"${combined_summary1.loc[idx, 'PrevsPost']:,.1f}"
             combined_summary1_display.loc[idx, 'LastYear Pre vs Post'] = f"${combined_summary1.loc[idx, 'LastYear Pre vs Post']:,.1f}"
         combined_summary1_display.loc[idx, 'Growth%'] = f"{combined_summary1.loc[idx, 'Growth%']:.1f}%"
@@ -724,12 +731,12 @@ def main():
         metric = idx
         if metric == 'Orders' or metric == 'New Customers':
             # Orders: format as integer string
-            combined_summary2_display.loc[idx, 'Post24'] = f"{int(round(combined_summary2.loc[idx, 'Post24'])):,}"
-            combined_summary2_display.loc[idx, 'Post25'] = f"{int(round(combined_summary2.loc[idx, 'Post25'])):,}"
+            combined_summary2_display.loc[idx, 'last year-post'] = f"{int(round(combined_summary2.loc[idx, 'last year-post'])):,}"
+            combined_summary2_display.loc[idx, 'post'] = f"{int(round(combined_summary2.loc[idx, 'post'])):,}"
             combined_summary2_display.loc[idx, 'YoY'] = f"{int(round(combined_summary2.loc[idx, 'YoY'])):,}"
         else:
-            combined_summary2_display.loc[idx, 'Post24'] = f"${combined_summary2.loc[idx, 'Post24']:,.1f}"
-            combined_summary2_display.loc[idx, 'Post25'] = f"${combined_summary2.loc[idx, 'Post25']:,.1f}"
+            combined_summary2_display.loc[idx, 'last year-post'] = f"${combined_summary2.loc[idx, 'last year-post']:,.1f}"
+            combined_summary2_display.loc[idx, 'post'] = f"${combined_summary2.loc[idx, 'post']:,.1f}"
             combined_summary2_display.loc[idx, 'YoY'] = f"${combined_summary2.loc[idx, 'YoY']:,.1f}"
         combined_summary2_display.loc[idx, 'YoY%'] = f"{combined_summary2.loc[idx, 'YoY%']:.1f}%"
     

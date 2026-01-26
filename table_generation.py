@@ -98,8 +98,8 @@ def create_summary_tables(sales_df, payouts_df, orders_df, new_customers_df, sel
     # Create Table 1: Pre vs Post
     table1_data = {
         'Metric': ['Sales', 'Payouts', 'Orders', 'New Customers'],
-        'Pre25': [sales_summary['pre_25'], payouts_summary['pre_25'], orders_summary['pre_25'], new_customers_summary['pre_25']],
-        'Post25': [sales_summary['post_25'], payouts_summary['post_25'], orders_summary['post_25'], new_customers_summary['post_25']],
+        'Pre': [sales_summary['pre_25'], payouts_summary['pre_25'], orders_summary['pre_25'], new_customers_summary['pre_25']],
+        'Post': [sales_summary['post_25'], payouts_summary['post_25'], orders_summary['post_25'], new_customers_summary['post_25']],
         'PrevsPost': [sales_summary['PrevsPost'], payouts_summary['PrevsPost'], orders_summary['PrevsPost'], new_customers_summary['PrevsPost']],
         'LastYear Pre vs Post': [sales_summary['LastYear_Pre_vs_Post'], payouts_summary['LastYear_Pre_vs_Post'], orders_summary['LastYear_Pre_vs_Post'], new_customers_summary['LastYear_Pre_vs_Post']],
         'Growth%': [sales_summary['Growth%'], payouts_summary['Growth%'], orders_summary['Growth%'], new_customers_summary['Growth%']]
@@ -110,8 +110,8 @@ def create_summary_tables(sales_df, payouts_df, orders_df, new_customers_df, sel
     # Create Table 2: YoY
     table2_data = {
         'Metric': ['Sales', 'Payouts', 'Orders', 'New Customers'],
-        'Post24': [sales_summary['post_24'], payouts_summary['post_24'], orders_summary['post_24'], new_customers_summary['post_24']],
-        'Post25': [sales_summary['post_25'], payouts_summary['post_25'], orders_summary['post_25'], new_customers_summary['post_25']],
+        'last year-post': [sales_summary['post_24'], payouts_summary['post_24'], orders_summary['post_24'], new_customers_summary['post_24']],
+        'post': [sales_summary['post_25'], payouts_summary['post_25'], orders_summary['post_25'], new_customers_summary['post_25']],
         'YoY': [sales_summary['YoY'], payouts_summary['YoY'], orders_summary['YoY'], new_customers_summary['YoY']],
         'YoY%': [sales_summary['YoY%'], payouts_summary['YoY%'], orders_summary['YoY%'], new_customers_summary['YoY%']]
     }
@@ -218,8 +218,8 @@ def create_combined_summary_tables(dd_sales_df, dd_payouts_df, dd_orders_df, dd_
     # Create Table 1: Pre vs Post
     table1_data = {
         'Metric': ['Sales', 'Payouts', 'Orders', 'New Customers'],
-        'Pre25': [combined_sales['pre_25'], combined_payouts['pre_25'], combined_orders['pre_25'], combined_new_customers['pre_25']],
-        'Post25': [combined_sales['post_25'], combined_payouts['post_25'], combined_orders['post_25'], combined_new_customers['post_25']],
+        'Pre': [combined_sales['pre_25'], combined_payouts['pre_25'], combined_orders['pre_25'], combined_new_customers['pre_25']],
+        'Post': [combined_sales['post_25'], combined_payouts['post_25'], combined_orders['post_25'], combined_new_customers['post_25']],
         'PrevsPost': [combined_sales['PrevsPost'], combined_payouts['PrevsPost'], combined_orders['PrevsPost'], combined_new_customers['PrevsPost']],
         'LastYear Pre vs Post': [combined_sales['LastYear_Pre_vs_Post'], combined_payouts['LastYear_Pre_vs_Post'], combined_orders['LastYear_Pre_vs_Post'], combined_new_customers['LastYear_Pre_vs_Post']],
         'Growth%': [combined_sales['Growth%'], combined_payouts['Growth%'], combined_orders['Growth%'], combined_new_customers['Growth%']]
@@ -230,8 +230,8 @@ def create_combined_summary_tables(dd_sales_df, dd_payouts_df, dd_orders_df, dd_
     # Create Table 2: YoY
     table2_data = {
         'Metric': ['Sales', 'Payouts', 'Orders', 'New Customers'],
-        'Post24': [combined_sales['post_24'], combined_payouts['post_24'], combined_orders['post_24'], combined_new_customers['post_24']],
-        'Post25': [combined_sales['post_25'], combined_payouts['post_25'], combined_orders['post_25'], combined_new_customers['post_25']],
+        'last year-post': [combined_sales['post_24'], combined_payouts['post_24'], combined_orders['post_24'], combined_new_customers['post_24']],
+        'post': [combined_sales['post_25'], combined_payouts['post_25'], combined_orders['post_25'], combined_new_customers['post_25']],
         'YoY': [combined_sales['YoY'], combined_payouts['YoY'], combined_orders['YoY'], combined_new_customers['YoY']],
         'YoY%': [combined_sales['YoY%'], combined_payouts['YoY%'], combined_orders['YoY%'], combined_new_customers['YoY%']]
     }
@@ -254,7 +254,7 @@ def create_combined_store_tables(dd_table1, dd_table2, ue_table1, ue_table2):
         # Merge on Store ID, summing values for stores that appear in both
         combined_table1 = pd.merge(dd_t1, ue_t1, on='Store ID', how='outer', suffixes=('_dd', '_ue'))
         # Sum numeric columns for stores in both platforms
-        numeric_cols = ['pre25', 'post25', 'PrevsPost', 'LastYear Pre vs Post']
+        numeric_cols = ['Pre', 'Post', 'PrevsPost', 'LastYear Pre vs Post']
         for col in numeric_cols:
             if f'{col}_dd' in combined_table1.columns and f'{col}_ue' in combined_table1.columns:
                 combined_table1[col] = combined_table1[f'{col}_dd'].fillna(0) + combined_table1[f'{col}_ue'].fillna(0)
@@ -266,13 +266,13 @@ def create_combined_store_tables(dd_table1, dd_table2, ue_table1, ue_table2):
                 combined_table1[col] = combined_table1[f'{col}_ue']
                 combined_table1 = combined_table1.drop(columns=[f'{col}_ue'])
         # Handle Growth% - recalculate from summed values
-        if 'pre25' in combined_table1.columns and 'PrevsPost' in combined_table1.columns:
-            combined_table1['Growth%'] = (combined_table1['PrevsPost'] / combined_table1['pre25'] * 100).replace([float('inf'), -float('inf')], 0).fillna(0).round(1)
+        if 'Pre' in combined_table1.columns and 'PrevsPost' in combined_table1.columns:
+            combined_table1['Growth%'] = (combined_table1['PrevsPost'] / combined_table1['Pre'] * 100).replace([float('inf'), -float('inf')], 0).fillna(0).round(1)
         # Keep only the needed columns
-        combined_table1 = combined_table1[['Store ID', 'pre25', 'post25', 'PrevsPost', 'LastYear Pre vs Post', 'Growth%']]
-        # Filter out rows where both pre25 and post25 are 0 or NaN (no data)
+        combined_table1 = combined_table1[['Store ID', 'Pre', 'Post', 'PrevsPost', 'LastYear Pre vs Post', 'Growth%']]
+        # Filter out rows where both Pre and Post are 0 or NaN (no data)
         combined_table1 = combined_table1[
-            (combined_table1['pre25'].fillna(0) != 0) | (combined_table1['post25'].fillna(0) != 0)
+            (combined_table1['Pre'].fillna(0) != 0) | (combined_table1['Post'].fillna(0) != 0)
         ]
         combined_table1 = combined_table1.set_index('Store ID')
     elif dd_table1 is not None:
@@ -295,7 +295,7 @@ def create_combined_store_tables(dd_table1, dd_table2, ue_table1, ue_table2):
         # Merge on Store ID, summing values for stores that appear in both
         combined_table2 = pd.merge(dd_t2, ue_t2, on='Store ID', how='outer', suffixes=('_dd', '_ue'))
         # Sum numeric columns for stores in both platforms
-        numeric_cols = ['post24', 'post25', 'YoY']
+        numeric_cols = ['last year-post', 'post', 'YoY']
         for col in numeric_cols:
             if f'{col}_dd' in combined_table2.columns and f'{col}_ue' in combined_table2.columns:
                 combined_table2[col] = combined_table2[f'{col}_dd'].fillna(0) + combined_table2[f'{col}_ue'].fillna(0)
@@ -307,13 +307,13 @@ def create_combined_store_tables(dd_table1, dd_table2, ue_table1, ue_table2):
                 combined_table2[col] = combined_table2[f'{col}_ue']
                 combined_table2 = combined_table2.drop(columns=[f'{col}_ue'])
         # Handle YoY% - recalculate from summed values
-        if 'post24' in combined_table2.columns and 'YoY' in combined_table2.columns:
-            combined_table2['YoY%'] = (combined_table2['YoY'] / combined_table2['post24'] * 100).replace([float('inf'), -float('inf')], 0).fillna(0).round(1)
+        if 'last year-post' in combined_table2.columns and 'YoY' in combined_table2.columns:
+            combined_table2['YoY%'] = (combined_table2['YoY'] / combined_table2['last year-post'] * 100).replace([float('inf'), -float('inf')], 0).fillna(0).round(1)
         # Keep only the needed columns
-        combined_table2 = combined_table2[['Store ID', 'post24', 'post25', 'YoY', 'YoY%']]
-        # Filter out rows where both post24 and post25 are 0 or NaN (no data)
+        combined_table2 = combined_table2[['Store ID', 'last year-post', 'post', 'YoY', 'YoY%']]
+        # Filter out rows where both last year-post and post are 0 or NaN (no data)
         combined_table2 = combined_table2[
-            (combined_table2['post24'].fillna(0) != 0) | (combined_table2['post25'].fillna(0) != 0)
+            (combined_table2['last year-post'].fillna(0) != 0) | (combined_table2['post'].fillna(0) != 0)
         ]
         combined_table2 = combined_table2.set_index('Store ID')
     elif dd_table2 is not None:
@@ -343,19 +343,29 @@ def get_platform_store_tables(sales_df, platform_key):
     # Table 1
     table1_df = filtered_sales_df[['Store ID', 'pre_25', 'post_25', 'PrevsPost', 'LastYear_Pre_vs_Post', 'Growth%']].copy()
     table1_df = table1_df.rename(columns={
-        'pre_25': 'pre25',
-        'post_25': 'post25',
+        'pre_25': 'Pre',
+        'post_25': 'Post',
         'PrevsPost': 'PrevsPost',
         'LastYear_Pre_vs_Post': 'LastYear Pre vs Post',
         'Growth%': 'Growth%'
     })
-    # Filter out rows where both pre25 and post25 are 0 or NaN (no data)
+    # Filter out rows where both Pre and Post are 0 or NaN (no data)
     table1_df = table1_df[
-        (table1_df['pre25'].fillna(0) != 0) | (table1_df['post25'].fillna(0) != 0)
+        (table1_df['Pre'].fillna(0) != 0) | (table1_df['Post'].fillna(0) != 0)
     ]
     
-    # Table 2 (YoY) - removed for now
-    table2_df = None
+    # Table 2 (YoY)
+    table2_df = filtered_sales_df[['Store ID', 'post_24', 'post_25', 'YoY', 'YoY%']].copy()
+    table2_df = table2_df.rename(columns={
+        'post_24': 'last year-post',
+        'post_25': 'post',
+        'YoY': 'YoY',
+        'YoY%': 'YoY%'
+    })
+    # Filter out rows where both last year-post and post are 0 or NaN (no data)
+    table2_df = table2_df[
+        (table2_df['last year-post'].fillna(0) != 0) | (table2_df['post'].fillna(0) != 0)
+    ]
     
     return table1_df, table2_df
 
