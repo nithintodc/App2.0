@@ -43,6 +43,15 @@ def create_store_selector(platform_name, df, platform_key, file_uploaded=False, 
         if platform_key not in st.session_state or not st.session_state[platform_key]:
             st.session_state[platform_key] = all_stores.copy()
         
+        # Filter default stores to only include stores that exist in current options
+        # This prevents errors when previously selected stores are no longer available
+        default_stores = [store for store in st.session_state[platform_key] if store in all_stores]
+        
+        # If no valid defaults, select all stores
+        if not default_stores:
+            default_stores = all_stores.copy()
+            st.session_state[platform_key] = all_stores.copy()
+        
         # Select all / Deselect all buttons
         col1, col2 = st.columns(2)
         with col1:
@@ -58,7 +67,7 @@ def create_store_selector(platform_name, df, platform_key, file_uploaded=False, 
         selected_stores = st.multiselect(
             f"Choose {platform_name} stores to analyze:",
             options=all_stores,
-            default=st.session_state[platform_key],
+            default=default_stores,
             key=f"store_selector_{platform_name}"
         )
         
