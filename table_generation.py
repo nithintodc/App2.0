@@ -46,39 +46,39 @@ def create_summary_tables(sales_df, payouts_df, orders_df, new_customers_df, sel
     
     # Aggregate across all stores
     sales_summary = {
-        'pre_24': sales_filtered['pre_24'].sum() if 'pre_24' in sales_filtered.columns else 0,
-        'pre_25': sales_filtered['pre_25'].sum(),
-        'post_24': sales_filtered['post_24'].sum(),
-        'post_25': sales_filtered['post_25'].sum(),
-        'PrevsPost': sales_filtered['PrevsPost'].sum(),
-        'LastYear_Pre_vs_Post': sales_filtered['LastYear_Pre_vs_Post'].sum(),
-        'YoY': sales_filtered['YoY'].sum(),
+        'pre_24': sales_filtered['pre_24'].sum() if not sales_filtered.empty and 'pre_24' in sales_filtered.columns else 0,
+        'pre_25': sales_filtered['pre_25'].sum() if not sales_filtered.empty and 'pre_25' in sales_filtered.columns else 0,
+        'post_24': sales_filtered['post_24'].sum() if not sales_filtered.empty and 'post_24' in sales_filtered.columns else 0,
+        'post_25': sales_filtered['post_25'].sum() if not sales_filtered.empty and 'post_25' in sales_filtered.columns else 0,
+        'PrevsPost': sales_filtered['PrevsPost'].sum() if not sales_filtered.empty and 'PrevsPost' in sales_filtered.columns else 0,
+        'LastYear_Pre_vs_Post': sales_filtered['LastYear_Pre_vs_Post'].sum() if not sales_filtered.empty and 'LastYear_Pre_vs_Post' in sales_filtered.columns else 0,
+        'YoY': sales_filtered['YoY'].sum() if not sales_filtered.empty and 'YoY' in sales_filtered.columns else 0,
     }
     # Calculate Growth% and YoY% from aggregated values
     sales_summary['Growth%'] = (sales_summary['PrevsPost'] / sales_summary['pre_25'] * 100) if sales_summary['pre_25'] != 0 else 0
     sales_summary['YoY%'] = (sales_summary['YoY'] / sales_summary['post_24'] * 100) if sales_summary['post_24'] != 0 else 0
     
     payouts_summary = {
-        'pre_24': payouts_filtered['pre_24'].sum() if 'pre_24' in payouts_filtered.columns else 0,
-        'pre_25': payouts_filtered['pre_25'].sum(),
-        'post_24': payouts_filtered['post_24'].sum(),
-        'post_25': payouts_filtered['post_25'].sum(),
-        'PrevsPost': payouts_filtered['PrevsPost'].sum(),
-        'LastYear_Pre_vs_Post': payouts_filtered['LastYear_Pre_vs_Post'].sum(),
-        'YoY': payouts_filtered['YoY'].sum(),
+        'pre_24': payouts_filtered['pre_24'].sum() if not payouts_filtered.empty and 'pre_24' in payouts_filtered.columns else 0,
+        'pre_25': payouts_filtered['pre_25'].sum() if not payouts_filtered.empty and 'pre_25' in payouts_filtered.columns else 0,
+        'post_24': payouts_filtered['post_24'].sum() if not payouts_filtered.empty and 'post_24' in payouts_filtered.columns else 0,
+        'post_25': payouts_filtered['post_25'].sum() if not payouts_filtered.empty and 'post_25' in payouts_filtered.columns else 0,
+        'PrevsPost': payouts_filtered['PrevsPost'].sum() if not payouts_filtered.empty and 'PrevsPost' in payouts_filtered.columns else 0,
+        'LastYear_Pre_vs_Post': payouts_filtered['LastYear_Pre_vs_Post'].sum() if not payouts_filtered.empty and 'LastYear_Pre_vs_Post' in payouts_filtered.columns else 0,
+        'YoY': payouts_filtered['YoY'].sum() if not payouts_filtered.empty and 'YoY' in payouts_filtered.columns else 0,
     }
     # Calculate Growth% and YoY% from aggregated values
     payouts_summary['Growth%'] = (payouts_summary['PrevsPost'] / payouts_summary['pre_25'] * 100) if payouts_summary['pre_25'] != 0 else 0
     payouts_summary['YoY%'] = (payouts_summary['YoY'] / payouts_summary['post_24'] * 100) if payouts_summary['post_24'] != 0 else 0
     
     orders_summary = {
-        'pre_24': orders_filtered['pre_24'].sum() if 'pre_24' in orders_filtered.columns else 0,
-        'pre_25': orders_filtered['pre_25'].sum(),
-        'post_24': orders_filtered['post_24'].sum(),
-        'post_25': orders_filtered['post_25'].sum(),
-        'PrevsPost': orders_filtered['PrevsPost'].sum(),
-        'LastYear_Pre_vs_Post': orders_filtered['LastYear_Pre_vs_Post'].sum(),
-        'YoY': orders_filtered['YoY'].sum(),
+        'pre_24': orders_filtered['pre_24'].sum() if not orders_filtered.empty and 'pre_24' in orders_filtered.columns else 0,
+        'pre_25': orders_filtered['pre_25'].sum() if not orders_filtered.empty and 'pre_25' in orders_filtered.columns else 0,
+        'post_24': orders_filtered['post_24'].sum() if not orders_filtered.empty and 'post_24' in orders_filtered.columns else 0,
+        'post_25': orders_filtered['post_25'].sum() if not orders_filtered.empty and 'post_25' in orders_filtered.columns else 0,
+        'PrevsPost': orders_filtered['PrevsPost'].sum() if not orders_filtered.empty and 'PrevsPost' in orders_filtered.columns else 0,
+        'LastYear_Pre_vs_Post': orders_filtered['LastYear_Pre_vs_Post'].sum() if not orders_filtered.empty and 'LastYear_Pre_vs_Post' in orders_filtered.columns else 0,
+        'YoY': orders_filtered['YoY'].sum() if not orders_filtered.empty and 'YoY' in orders_filtered.columns else 0,
     }
     # Calculate Growth% and YoY% from aggregated values
     orders_summary['Growth%'] = (orders_summary['PrevsPost'] / orders_summary['pre_25'] * 100) if orders_summary['pre_25'] != 0 else 0
@@ -100,14 +100,14 @@ def create_summary_tables(sales_df, payouts_df, orders_df, new_customers_df, sel
     
     # Calculate Profitability (Payouts/Sales%) and AOV (Sales/Orders)
     # Profitability: Pre
-    profitability_pre = (payouts_summary['pre_25'] / sales_summary['pre_25'] * 100) if sales_summary['pre_25'] != 0 else 0
+    profitability_pre = (payouts_summary.get('pre_25', 0) / sales_summary.get('pre_25', 1) * 100) if sales_summary.get('pre_25', 0) != 0 else 0
     # Profitability: Post
-    profitability_post = (payouts_summary['post_25'] / sales_summary['post_25'] * 100) if sales_summary['post_25'] != 0 else 0
+    profitability_post = (payouts_summary.get('post_25', 0) / sales_summary.get('post_25', 1) * 100) if sales_summary.get('post_25', 0) != 0 else 0
     # Profitability: PrevsPost
     profitability_prevs_post = profitability_post - profitability_pre
     # Profitability: LastYear Pre vs Post
-    profitability_last_year_pre = (payouts_summary['pre_24'] / sales_summary['pre_24'] * 100) if sales_summary['pre_24'] != 0 else 0
-    profitability_last_year_post = (payouts_summary['post_24'] / sales_summary['post_24'] * 100) if sales_summary['post_24'] != 0 else 0
+    profitability_last_year_pre = (payouts_summary.get('pre_24', 0) / sales_summary.get('pre_24', 1) * 100) if sales_summary.get('pre_24', 0) != 0 else 0
+    profitability_last_year_post = (payouts_summary.get('post_24', 0) / sales_summary.get('post_24', 1) * 100) if sales_summary.get('post_24', 0) != 0 else 0
     profitability_last_year_prevs_post = profitability_last_year_post - profitability_last_year_pre
     # Profitability: Growth%
     profitability_growth = (profitability_prevs_post / profitability_pre * 100) if profitability_pre != 0 else 0
@@ -128,14 +128,14 @@ def create_summary_tables(sales_df, payouts_df, orders_df, new_customers_df, sel
     }
     
     # AOV: Pre
-    aov_pre = (sales_summary['pre_25'] / orders_summary['pre_25']) if orders_summary['pre_25'] != 0 else 0
+    aov_pre = (sales_summary.get('pre_25', 0) / orders_summary.get('pre_25', 1)) if orders_summary.get('pre_25', 0) != 0 else 0
     # AOV: Post
-    aov_post = (sales_summary['post_25'] / orders_summary['post_25']) if orders_summary['post_25'] != 0 else 0
+    aov_post = (sales_summary.get('post_25', 0) / orders_summary.get('post_25', 1)) if orders_summary.get('post_25', 0) != 0 else 0
     # AOV: PrevsPost
     aov_prevs_post = aov_post - aov_pre
     # AOV: LastYear Pre vs Post
-    aov_last_year_pre = (sales_summary['pre_24'] / orders_summary['pre_24']) if orders_summary['pre_24'] != 0 else 0
-    aov_last_year_post = (sales_summary['post_24'] / orders_summary['post_24']) if orders_summary['post_24'] != 0 else 0
+    aov_last_year_pre = (sales_summary.get('pre_24', 0) / orders_summary.get('pre_24', 1)) if orders_summary.get('pre_24', 0) != 0 else 0
+    aov_last_year_post = (sales_summary.get('post_24', 0) / orders_summary.get('post_24', 1)) if orders_summary.get('post_24', 0) != 0 else 0
     aov_last_year_prevs_post = aov_last_year_post - aov_last_year_pre
     # AOV: Growth%
     aov_growth = (aov_prevs_post / aov_pre * 100) if aov_pre != 0 else 0
@@ -283,14 +283,14 @@ def create_combined_summary_tables(dd_sales_df, dd_payouts_df, dd_orders_df, dd_
     
     # Calculate Profitability (Payouts/Sales%) and AOV (Sales/Orders)
     # Profitability: Pre
-    profitability_pre = (combined_payouts['pre_25'] / combined_sales['pre_25'] * 100) if combined_sales['pre_25'] != 0 else 0
+    profitability_pre = (combined_payouts.get('pre_25', 0) / combined_sales.get('pre_25', 1) * 100) if combined_sales.get('pre_25', 0) != 0 else 0
     # Profitability: Post
-    profitability_post = (combined_payouts['post_25'] / combined_sales['post_25'] * 100) if combined_sales['post_25'] != 0 else 0
+    profitability_post = (combined_payouts.get('post_25', 0) / combined_sales.get('post_25', 1) * 100) if combined_sales.get('post_25', 0) != 0 else 0
     # Profitability: PrevsPost
     profitability_prevs_post = profitability_post - profitability_pre
     # Profitability: LastYear Pre vs Post
-    profitability_last_year_pre = (combined_payouts['pre_24'] / combined_sales['pre_24'] * 100) if combined_sales['pre_24'] != 0 else 0
-    profitability_last_year_post = (combined_payouts['post_24'] / combined_sales['post_24'] * 100) if combined_sales['post_24'] != 0 else 0
+    profitability_last_year_pre = (combined_payouts.get('pre_24', 0) / combined_sales.get('pre_24', 1) * 100) if combined_sales.get('pre_24', 0) != 0 else 0
+    profitability_last_year_post = (combined_payouts.get('post_24', 0) / combined_sales.get('post_24', 1) * 100) if combined_sales.get('post_24', 0) != 0 else 0
     profitability_last_year_prevs_post = profitability_last_year_post - profitability_last_year_pre
     # Profitability: Growth%
     profitability_growth = (profitability_prevs_post / profitability_pre * 100) if profitability_pre != 0 else 0
@@ -311,14 +311,14 @@ def create_combined_summary_tables(dd_sales_df, dd_payouts_df, dd_orders_df, dd_
     }
     
     # AOV: Pre
-    aov_pre = (combined_sales['pre_25'] / combined_orders['pre_25']) if combined_orders['pre_25'] != 0 else 0
+    aov_pre = (combined_sales.get('pre_25', 0) / combined_orders.get('pre_25', 1)) if combined_orders.get('pre_25', 0) != 0 else 0
     # AOV: Post
-    aov_post = (combined_sales['post_25'] / combined_orders['post_25']) if combined_orders['post_25'] != 0 else 0
+    aov_post = (combined_sales.get('post_25', 0) / combined_orders.get('post_25', 1)) if combined_orders.get('post_25', 0) != 0 else 0
     # AOV: PrevsPost
     aov_prevs_post = aov_post - aov_pre
     # AOV: LastYear Pre vs Post
-    aov_last_year_pre = (combined_sales['pre_24'] / combined_orders['pre_24']) if combined_orders['pre_24'] != 0 else 0
-    aov_last_year_post = (combined_sales['post_24'] / combined_orders['post_24']) if combined_orders['post_24'] != 0 else 0
+    aov_last_year_pre = (combined_sales.get('pre_24', 0) / combined_orders.get('pre_24', 1)) if combined_orders.get('pre_24', 0) != 0 else 0
+    aov_last_year_post = (combined_sales.get('post_24', 0) / combined_orders.get('post_24', 1)) if combined_orders.get('post_24', 0) != 0 else 0
     aov_last_year_prevs_post = aov_last_year_post - aov_last_year_pre
     # AOV: Growth%
     aov_growth = (aov_prevs_post / aov_pre * 100) if aov_pre != 0 else 0
