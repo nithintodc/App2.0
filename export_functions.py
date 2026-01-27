@@ -375,27 +375,12 @@ def create_date_export(dd_pre_24_path, dd_post_24_path, dd_pre_25_path, dd_post_
             
             # Find "Order Date" column for UE (case-insensitive matching)
             # Try all common variations: "Order Date", "Order date", "order date", "order Date"
-            date_col = None
-            preferred_names = UE_DATE_COLUMN_VARIATIONS
-            
-            # First try exact match
-            for name in preferred_names:
-                if name in df.columns:
-                    date_col = name
-                    break
-            
-            # Then try case-insensitive match
-            if date_col is None:
-                df_cols_lower = {col.lower().strip(): col for col in df.columns}
-                for name in preferred_names:
-                    name_lower = name.lower().strip()
-                    if name_lower in df_cols_lower:
-                        date_col = df_cols_lower[name_lower]
-                        break
+            from utils import find_date_column
+            date_col = find_date_column(df, UE_DATE_COLUMN_VARIATIONS)
             
             if date_col is None:
-                st.warning(f"Date column not found in UE file. Available columns: {list(df.columns)[:10]}")
-                date_col = UE_DATE_COLUMN_VARIATIONS[0]  # Default fallback (may cause error if not present)
+                st.warning(f"Date column not found in UE file. Tried: {UE_DATE_COLUMN_VARIATIONS}. Available columns: {list(df.columns)[:10]}")
+                return pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
             
             sales_col = 'Sales (excl. tax)'
             payout_col = 'Total payout'
@@ -604,18 +589,13 @@ def _create_period_excel_file(df, platform, period_name, store_col, sales_col, p
         Bytes of Excel file
     """
     try:
-        # Find date column
+        # Find date column using proper matching (case-insensitive)
+        from utils import find_date_column, DD_DATE_COLUMN_VARIATIONS
         date_col = None
         if platform == 'DD':
-            for col in ['Timestamp local date', 'Timestamp Local Date', 'Date', 'date']:
-                if col in df.columns:
-                    date_col = col
-                    break
+            date_col = find_date_column(df, DD_DATE_COLUMN_VARIATIONS)
         else:  # UE
-            for col in UE_DATE_COLUMN_VARIATIONS:
-                if col in df.columns:
-                    date_col = col
-                    break
+            date_col = find_date_column(df, UE_DATE_COLUMN_VARIATIONS)
         
         if date_col is None or store_col is None or store_col not in df.columns:
             return None

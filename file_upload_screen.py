@@ -46,18 +46,10 @@ def extract_file_info(file_path, file_type):
                     break
         elif file_type == 'ue':
             # Try multiple possible column names for UE (case-insensitive matching)
-            from utils import UE_DATE_COLUMN_VARIATIONS
+            from utils import find_date_column, UE_DATE_COLUMN_VARIATIONS
             possible_cols = UE_DATE_COLUMN_VARIATIONS + ['Order Date (Local)']
-            for col in df.columns:
-                col_lower = col.lower().strip()
-                # Try exact match first
-                if col in possible_cols:
-                    date_col = col
-                    break
-                # Then try case-insensitive match
-                if any(col_lower == possible.lower().strip() for possible in possible_cols):
-                    date_col = col
-                    break
+            # Use find_date_column for proper case-insensitive matching
+            date_col = find_date_column(df, possible_cols)
         elif file_type == 'marketing':
             possible_cols = ['Date', 'date']
             for col in df.columns:
