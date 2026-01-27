@@ -46,11 +46,12 @@ def create_summary_tables(sales_df, payouts_df, orders_df, new_customers_df, sel
     
     # Aggregate across all stores
     sales_summary = {
+        'pre_24': sales_filtered['pre_24'].sum() if 'pre_24' in sales_filtered.columns else 0,
         'pre_25': sales_filtered['pre_25'].sum(),
+        'post_24': sales_filtered['post_24'].sum(),
         'post_25': sales_filtered['post_25'].sum(),
         'PrevsPost': sales_filtered['PrevsPost'].sum(),
         'LastYear_Pre_vs_Post': sales_filtered['LastYear_Pre_vs_Post'].sum(),
-        'post_24': sales_filtered['post_24'].sum(),
         'YoY': sales_filtered['YoY'].sum(),
     }
     # Calculate Growth% and YoY% from aggregated values
@@ -58,11 +59,12 @@ def create_summary_tables(sales_df, payouts_df, orders_df, new_customers_df, sel
     sales_summary['YoY%'] = (sales_summary['YoY'] / sales_summary['post_24'] * 100) if sales_summary['post_24'] != 0 else 0
     
     payouts_summary = {
+        'pre_24': payouts_filtered['pre_24'].sum() if 'pre_24' in payouts_filtered.columns else 0,
         'pre_25': payouts_filtered['pre_25'].sum(),
+        'post_24': payouts_filtered['post_24'].sum(),
         'post_25': payouts_filtered['post_25'].sum(),
         'PrevsPost': payouts_filtered['PrevsPost'].sum(),
         'LastYear_Pre_vs_Post': payouts_filtered['LastYear_Pre_vs_Post'].sum(),
-        'post_24': payouts_filtered['post_24'].sum(),
         'YoY': payouts_filtered['YoY'].sum(),
     }
     # Calculate Growth% and YoY% from aggregated values
@@ -70,11 +72,12 @@ def create_summary_tables(sales_df, payouts_df, orders_df, new_customers_df, sel
     payouts_summary['YoY%'] = (payouts_summary['YoY'] / payouts_summary['post_24'] * 100) if payouts_summary['post_24'] != 0 else 0
     
     orders_summary = {
+        'pre_24': orders_filtered['pre_24'].sum() if 'pre_24' in orders_filtered.columns else 0,
         'pre_25': orders_filtered['pre_25'].sum(),
+        'post_24': orders_filtered['post_24'].sum(),
         'post_25': orders_filtered['post_25'].sum(),
         'PrevsPost': orders_filtered['PrevsPost'].sum(),
         'LastYear_Pre_vs_Post': orders_filtered['LastYear_Pre_vs_Post'].sum(),
-        'post_24': orders_filtered['post_24'].sum(),
         'YoY': orders_filtered['YoY'].sum(),
     }
     # Calculate Growth% and YoY% from aggregated values
@@ -196,11 +199,13 @@ def create_combined_summary_tables(dd_sales_df, dd_payouts_df, dd_orders_df, dd_
     
     # Combine Sales
     combined_sales = {
+        'pre_24': ((dd_sales_filtered['pre_24'].sum() if 'pre_24' in dd_sales_filtered.columns and not dd_sales_filtered.empty else 0) + 
+                   (ue_sales_filtered['pre_24'].sum() if 'pre_24' in ue_sales_filtered.columns and not ue_sales_filtered.empty else 0)),
         'pre_25': (dd_sales_filtered['pre_25'].sum() if not dd_sales_filtered.empty else 0) + (ue_sales_filtered['pre_25'].sum() if not ue_sales_filtered.empty else 0),
+        'post_24': (dd_sales_filtered['post_24'].sum() if not dd_sales_filtered.empty else 0) + (ue_sales_filtered['post_24'].sum() if not ue_sales_filtered.empty else 0),
         'post_25': (dd_sales_filtered['post_25'].sum() if not dd_sales_filtered.empty else 0) + (ue_sales_filtered['post_25'].sum() if not ue_sales_filtered.empty else 0),
         'PrevsPost': (dd_sales_filtered['PrevsPost'].sum() if not dd_sales_filtered.empty else 0) + (ue_sales_filtered['PrevsPost'].sum() if not ue_sales_filtered.empty else 0),
         'LastYear_Pre_vs_Post': (dd_sales_filtered['LastYear_Pre_vs_Post'].sum() if not dd_sales_filtered.empty else 0) + (ue_sales_filtered['LastYear_Pre_vs_Post'].sum() if not ue_sales_filtered.empty else 0),
-        'post_24': (dd_sales_filtered['post_24'].sum() if not dd_sales_filtered.empty else 0) + (ue_sales_filtered['post_24'].sum() if not ue_sales_filtered.empty else 0),
         'YoY': (dd_sales_filtered['YoY'].sum() if not dd_sales_filtered.empty else 0) + (ue_sales_filtered['YoY'].sum() if not ue_sales_filtered.empty else 0),
     }
     combined_sales['Growth%'] = (combined_sales['PrevsPost'] / combined_sales['pre_25'] * 100) if combined_sales['pre_25'] != 0 else 0
@@ -208,11 +213,13 @@ def create_combined_summary_tables(dd_sales_df, dd_payouts_df, dd_orders_df, dd_
     
     # Combine Payouts
     combined_payouts = {
+        'pre_24': ((dd_payouts_filtered['pre_24'].sum() if 'pre_24' in dd_payouts_filtered.columns and not dd_payouts_filtered.empty else 0) + 
+                   (ue_payouts_filtered['pre_24'].sum() if 'pre_24' in ue_payouts_filtered.columns and not ue_payouts_filtered.empty else 0)),
         'pre_25': (dd_payouts_filtered['pre_25'].sum() if not dd_payouts_filtered.empty else 0) + (ue_payouts_filtered['pre_25'].sum() if not ue_payouts_filtered.empty else 0),
+        'post_24': (dd_payouts_filtered['post_24'].sum() if not dd_payouts_filtered.empty else 0) + (ue_payouts_filtered['post_24'].sum() if not ue_payouts_filtered.empty else 0),
         'post_25': (dd_payouts_filtered['post_25'].sum() if not dd_payouts_filtered.empty else 0) + (ue_payouts_filtered['post_25'].sum() if not ue_payouts_filtered.empty else 0),
         'PrevsPost': (dd_payouts_filtered['PrevsPost'].sum() if not dd_payouts_filtered.empty else 0) + (ue_payouts_filtered['PrevsPost'].sum() if not ue_payouts_filtered.empty else 0),
         'LastYear_Pre_vs_Post': (dd_payouts_filtered['LastYear_Pre_vs_Post'].sum() if not dd_payouts_filtered.empty else 0) + (ue_payouts_filtered['LastYear_Pre_vs_Post'].sum() if not ue_payouts_filtered.empty else 0),
-        'post_24': (dd_payouts_filtered['post_24'].sum() if not dd_payouts_filtered.empty else 0) + (ue_payouts_filtered['post_24'].sum() if not ue_payouts_filtered.empty else 0),
         'YoY': (dd_payouts_filtered['YoY'].sum() if not dd_payouts_filtered.empty else 0) + (ue_payouts_filtered['YoY'].sum() if not ue_payouts_filtered.empty else 0),
     }
     combined_payouts['Growth%'] = (combined_payouts['PrevsPost'] / combined_payouts['pre_25'] * 100) if combined_payouts['pre_25'] != 0 else 0
@@ -220,11 +227,13 @@ def create_combined_summary_tables(dd_sales_df, dd_payouts_df, dd_orders_df, dd_
     
     # Combine Orders
     combined_orders = {
+        'pre_24': ((dd_orders_filtered['pre_24'].sum() if 'pre_24' in dd_orders_filtered.columns and not dd_orders_filtered.empty else 0) + 
+                   (ue_orders_filtered['pre_24'].sum() if 'pre_24' in ue_orders_filtered.columns and not ue_orders_filtered.empty else 0)),
         'pre_25': (dd_orders_filtered['pre_25'].sum() if not dd_orders_filtered.empty else 0) + (ue_orders_filtered['pre_25'].sum() if not ue_orders_filtered.empty else 0),
+        'post_24': (dd_orders_filtered['post_24'].sum() if not dd_orders_filtered.empty else 0) + (ue_orders_filtered['post_24'].sum() if not ue_orders_filtered.empty else 0),
         'post_25': (dd_orders_filtered['post_25'].sum() if not dd_orders_filtered.empty else 0) + (ue_orders_filtered['post_25'].sum() if not ue_orders_filtered.empty else 0),
         'PrevsPost': (dd_orders_filtered['PrevsPost'].sum() if not dd_orders_filtered.empty else 0) + (ue_orders_filtered['PrevsPost'].sum() if not ue_orders_filtered.empty else 0),
         'LastYear_Pre_vs_Post': (dd_orders_filtered['LastYear_Pre_vs_Post'].sum() if not dd_orders_filtered.empty else 0) + (ue_orders_filtered['LastYear_Pre_vs_Post'].sum() if not ue_orders_filtered.empty else 0),
-        'post_24': (dd_orders_filtered['post_24'].sum() if not dd_orders_filtered.empty else 0) + (ue_orders_filtered['post_24'].sum() if not ue_orders_filtered.empty else 0),
         'YoY': (dd_orders_filtered['YoY'].sum() if not dd_orders_filtered.empty else 0) + (ue_orders_filtered['YoY'].sum() if not ue_orders_filtered.empty else 0),
     }
     combined_orders['Growth%'] = (combined_orders['PrevsPost'] / combined_orders['pre_25'] * 100) if combined_orders['pre_25'] != 0 else 0
