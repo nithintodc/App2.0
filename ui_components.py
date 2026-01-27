@@ -83,9 +83,12 @@ def display_store_tables(platform_name, table1_df, table2_df):
     if 'Pre' in table1_display.columns and 'Post' in table1_display.columns:
         table1_display = table1_display[
             (table1_display['Pre'].fillna(0) != 0) | (table1_display['Post'].fillna(0) != 0)
-        ]
+        ].copy()  # Use .copy() to ensure we have a clean dataframe
     
     if not table1_display.empty:
+        # Reset index to ensure clean row numbers before setting Store ID as index
+        if 'Store ID' in table1_display.columns:
+            table1_display = table1_display.reset_index(drop=True)
         table1_display['Pre'] = table1_display['Pre'].apply(lambda x: f"${x:,.1f}")
         table1_display['Post'] = table1_display['Post'].apply(lambda x: f"${x:,.1f}")
         table1_display['PrevsPost'] = table1_display['PrevsPost'].apply(lambda x: f"${x:,.1f}")
@@ -105,9 +108,12 @@ def display_store_tables(platform_name, table1_df, table2_df):
         if 'last year-post' in table2_display.columns and 'post' in table2_display.columns:
             table2_display = table2_display[
                 (table2_display['last year-post'].fillna(0) != 0) | (table2_display['post'].fillna(0) != 0)
-            ]
+            ].copy()  # Use .copy() to ensure we have a clean dataframe
         
         if not table2_display.empty:
+            # Reset index to ensure clean row numbers before setting Store ID as index
+            if 'Store ID' in table2_display.columns:
+                table2_display = table2_display.reset_index(drop=True)
             # Format dollar columns
             if 'last year-post' in table2_display.columns:
                 table2_display['last year-post'] = table2_display['last year-post'].apply(lambda x: f"${x:,.1f}")
@@ -145,6 +151,18 @@ def display_summary_tables(platform_name, summary_table1, summary_table2):
             summary_table1_display.loc[idx, 'Post'] = f"{int(round(summary_table1.loc[idx, 'Post'])):,}"
             summary_table1_display.loc[idx, 'PrevsPost'] = f"{int(round(summary_table1.loc[idx, 'PrevsPost'])):,}"
             summary_table1_display.loc[idx, 'LastYear Pre vs Post'] = f"{int(round(summary_table1.loc[idx, 'LastYear Pre vs Post'])):,}"
+        elif metric == 'Profitability':
+            # Profitability: format as percentage
+            summary_table1_display.loc[idx, 'Pre'] = f"{summary_table1.loc[idx, 'Pre']:.1f}%"
+            summary_table1_display.loc[idx, 'Post'] = f"{summary_table1.loc[idx, 'Post']:.1f}%"
+            summary_table1_display.loc[idx, 'PrevsPost'] = f"{summary_table1.loc[idx, 'PrevsPost']:.1f}%"
+            summary_table1_display.loc[idx, 'LastYear Pre vs Post'] = f"{summary_table1.loc[idx, 'LastYear Pre vs Post']:.1f}%"
+        elif metric == 'AOV':
+            # AOV: format as dollars
+            summary_table1_display.loc[idx, 'Pre'] = f"${summary_table1.loc[idx, 'Pre']:,.1f}"
+            summary_table1_display.loc[idx, 'Post'] = f"${summary_table1.loc[idx, 'Post']:,.1f}"
+            summary_table1_display.loc[idx, 'PrevsPost'] = f"${summary_table1.loc[idx, 'PrevsPost']:,.1f}"
+            summary_table1_display.loc[idx, 'LastYear Pre vs Post'] = f"${summary_table1.loc[idx, 'LastYear Pre vs Post']:,.1f}"
         else:
             # Sales/Payouts: format as dollars
             summary_table1_display.loc[idx, 'Pre'] = f"${summary_table1.loc[idx, 'Pre']:,.1f}"
@@ -174,6 +192,16 @@ def display_summary_tables(platform_name, summary_table1, summary_table2):
             summary_table2_display.loc[idx, 'last year-post'] = f"{int(round(summary_table2.loc[idx, 'last year-post'])):,}"
             summary_table2_display.loc[idx, 'post'] = f"{int(round(summary_table2.loc[idx, 'post'])):,}"
             summary_table2_display.loc[idx, 'YoY'] = f"{int(round(summary_table2.loc[idx, 'YoY'])):,}"
+        elif metric == 'Profitability':
+            # Profitability: format as percentage
+            summary_table2_display.loc[idx, 'last year-post'] = f"{summary_table2.loc[idx, 'last year-post']:.1f}%"
+            summary_table2_display.loc[idx, 'post'] = f"{summary_table2.loc[idx, 'post']:.1f}%"
+            summary_table2_display.loc[idx, 'YoY'] = f"{summary_table2.loc[idx, 'YoY']:.1f}%"
+        elif metric == 'AOV':
+            # AOV: format as dollars
+            summary_table2_display.loc[idx, 'last year-post'] = f"${summary_table2.loc[idx, 'last year-post']:,.1f}"
+            summary_table2_display.loc[idx, 'post'] = f"${summary_table2.loc[idx, 'post']:,.1f}"
+            summary_table2_display.loc[idx, 'YoY'] = f"${summary_table2.loc[idx, 'YoY']:,.1f}"
         else:
             # Sales/Payouts: format as dollars
             summary_table2_display.loc[idx, 'last year-post'] = f"${summary_table2.loc[idx, 'last year-post']:,.1f}"

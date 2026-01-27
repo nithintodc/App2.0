@@ -3,13 +3,16 @@ import pandas as pd
 import streamlit as st
 from datetime import datetime
 from pathlib import Path
+import zipfile
+import io
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Font
 from openpyxl.utils import get_column_letter
 from config import ROOT_DIR
 from gdrive_utils import get_drive_manager
-from utils import normalize_store_id_column
+from utils import normalize_store_id_column, filter_master_file_by_date_range
 from table_generation import create_summary_tables
+from data_processing import get_last_year_dates
 
 
 def export_to_excel(dd_table1, dd_table2, ue_table1, ue_table2, 
@@ -112,6 +115,14 @@ def export_to_excel(dd_table1, dd_table2, ue_table1, ue_table2,
                     # Orders and New Customers rows: format as integer with comma separators (no decimals, no dollar sign)
                     if isinstance(value, (int, float)):
                         cell.value = f"{int(round(value)):,}"
+                elif metric_value == 'Profitability':
+                    # Profitability: format as percentage
+                    if isinstance(value, (int, float)):
+                        cell.value = f"{value:.1f}%"
+                elif metric_value == 'AOV':
+                    # AOV: format as dollar amount
+                    if isinstance(value, (int, float)):
+                        cell.value = f"${value:,.1f}"
                 else:
                     # Format as dollar amount
                     if isinstance(value, (int, float)):
@@ -478,3 +489,196 @@ def create_date_export(dd_pre_24_path, dd_post_24_path, dd_pre_25_path, dd_post_
                 st.code(traceback.format_exc())
     
     return result if result else None
+
+
+def create_date_export_from_master_files(dd_data_path, ue_data_path, pre_start_date, pre_end_date, post_start_date, post_end_date, excluded_dates=None):
+    """
+    Create date-wise exports of DD and UE financial data.
+    Exports sales, payouts, orders store-wise for each date in the date ranges.
+    Returns a zip file with CSV files organized by platform and period.
+    
+    Args:
+        dd_data_path: Path to DoorDash master file
+        ue_data_path: Path to UberEats master file
+        pre_start_date: Pre period start date (MM/DD/YYYY)
+        pre_end_date: Pre period end date (MM/DD/YYYY)
+        post_start_date: Post period start date (MM/DD/YYYY)
+        post_end_date: Post period end date (MM/DD/YYYY)
+        excluded_dates: List of dates to exclude
+    
+    Returns:
+        Tuple of (zip_bytes, filename) for download
+    """
+    try:
+        # Calculate last year dates
+        pre_24_start, pre_24_end = get_last_year_dates(pre_start_date, pre_end_date)
+        post_24_start, post_24_end = get_last_year_dates(post_start_date, post_end_date)
+        
+        # Create in-memory zip file
+        zip_buffer = io.BytesIO()
+        
+        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+            # Process DoorDash data
+            if dd_data_path and Path(dd_data_path).exists():
+                # DD Pre 25
+                dd_pre_25 = filter_master_file_by_date_range(
+                    Path(dd_data_path), pre_start_date, pre_end_date,
+                    ['Timestamp local date', 'Timestamp Local Date', 'Date', 'date'],
+                    excluded_dates
+                )
+                if not dd_pre_25.empty:
+                    _add_date_export_to_zip(zip_file, dd_pre_25, 'DD', 'Pre_25', 'Merchant store ID', 'Subtotal', 'Net total', 'DoorDash order ID')
+                
+                # DD Post 25
+                dd_post_25 = filter_master_file_by_date_range(
+                    Path(dd_data_path), post_start_date, post_end_date,
+                    ['Timestamp local date', 'Timestamp Local Date', 'Date', 'date'],
+                    excluded_dates
+                )
+                if not dd_post_25.empty:
+                    _add_date_export_to_zip(zip_file, dd_post_25, 'DD', 'Post_25', 'Merchant store ID', 'Subtotal', 'Net total', 'DoorDash order ID')
+                
+                # DD Pre 24
+                dd_pre_24 = filter_master_file_by_date_range(
+                    Path(dd_data_path), pre_24_start, pre_24_end,
+                    ['Timestamp local date', 'Timestamp Local Date', 'Date', 'date'],
+                    excluded_dates
+                )
+                if not dd_pre_24.empty:
+                    _add_date_export_to_zip(zip_file, dd_pre_24, 'DD', 'Pre_24', 'Merchant store ID', 'Subtotal', 'Net total (for historical reference only)', 'DoorDash order ID')
+                
+                # DD Post 24
+                dd_post_24 = filter_master_file_by_date_range(
+                    Path(dd_data_path), post_24_start, post_24_end,
+                    ['Timestamp local date', 'Timestamp Local Date', 'Date', 'date'],
+                    excluded_dates
+                )
+                if not dd_post_24.empty:
+                    _add_date_export_to_zip(zip_file, dd_post_24, 'DD', 'Post_24', 'Merchant store ID', 'Subtotal', 'Net total (for historical reference only)', 'DoorDash order ID')
+            
+            # Process UberEats data
+            if ue_data_path and Path(ue_data_path).exists():
+                # UE Pre 25
+                ue_pre_25 = filter_master_file_by_date_range(
+                    Path(ue_data_path), pre_start_date, pre_end_date,
+                    ['Order Date', 'Order date', 'order date', 'order Date', 'Date', 'date'],
+                    excluded_dates
+                )
+                if not ue_pre_25.empty:
+                    ue_pre_25, store_col = normalize_store_id_column(ue_pre_25)
+                    _add_date_export_to_zip(zip_file, ue_pre_25, 'UE', 'Pre_25', store_col, 'Sales (excl. tax)', 'Total payout', 'Order ID')
+                
+                # UE Post 25
+                ue_post_25 = filter_master_file_by_date_range(
+                    Path(ue_data_path), post_start_date, post_end_date,
+                    ['Order Date', 'Order date', 'order date', 'order Date', 'Date', 'date'],
+                    excluded_dates
+                )
+                if not ue_post_25.empty:
+                    ue_post_25, store_col = normalize_store_id_column(ue_post_25)
+                    _add_date_export_to_zip(zip_file, ue_post_25, 'UE', 'Post_25', store_col, 'Sales (excl. tax)', 'Total payout', 'Order ID')
+                
+                # UE Pre 24
+                ue_pre_24 = filter_master_file_by_date_range(
+                    Path(ue_data_path), pre_24_start, pre_24_end,
+                    ['Order Date', 'Order date', 'order date', 'order Date', 'Date', 'date'],
+                    excluded_dates
+                )
+                if not ue_pre_24.empty:
+                    ue_pre_24, store_col = normalize_store_id_column(ue_pre_24)
+                    _add_date_export_to_zip(zip_file, ue_pre_24, 'UE', 'Pre_24', store_col, 'Sales (excl. tax)', 'Total payout', 'Order ID')
+                
+                # UE Post 24
+                ue_post_24 = filter_master_file_by_date_range(
+                    Path(ue_data_path), post_24_start, post_24_end,
+                    ['Order Date', 'Order date', 'order date', 'order Date', 'Date', 'date'],
+                    excluded_dates
+                )
+                if not ue_post_24.empty:
+                    ue_post_24, store_col = normalize_store_id_column(ue_post_24)
+                    _add_date_export_to_zip(zip_file, ue_post_24, 'UE', 'Post_24', store_col, 'Sales (excl. tax)', 'Total payout', 'Order ID')
+        
+        zip_buffer.seek(0)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"date_export_{timestamp}.zip"
+        
+        return zip_buffer.read(), filename
+    
+    except Exception as e:
+        st.error(f"Error creating date export: {str(e)}")
+        import traceback
+        with st.expander("Error details"):
+            st.code(traceback.format_exc())
+        return None, None
+
+
+def _add_date_export_to_zip(zip_file, df, platform, period, store_col, sales_col, payout_col, order_col):
+    """
+    Helper function to create date-wise pivot tables and add them to zip file.
+    
+    Args:
+        zip_file: ZipFile object
+        df: DataFrame with data
+        platform: 'DD' or 'UE'
+        period: 'Pre_25', 'Post_25', 'Pre_24', 'Post_24'
+        store_col: Name of store ID column
+        sales_col: Name of sales column
+        payout_col: Name of payout column
+        order_col: Name of order ID column
+    """
+    try:
+        # Find date column
+        date_col = None
+        if platform == 'DD':
+            for col in ['Timestamp local date', 'Timestamp Local Date', 'Date', 'date']:
+                if col in df.columns:
+                    date_col = col
+                    break
+        else:  # UE
+            for col in ['Order Date', 'Order date', 'order date', 'order Date', 'Date', 'date']:
+                if col in df.columns:
+                    date_col = col
+                    break
+        
+        if date_col is None or store_col is None or store_col not in df.columns:
+            return
+        
+        # Convert date column
+        df[date_col] = pd.to_datetime(df[date_col], errors='coerce')
+        df = df.dropna(subset=[date_col, store_col])
+        
+        if df.empty:
+            return
+        
+        # Convert to numeric
+        if sales_col in df.columns:
+            df[sales_col] = pd.to_numeric(df[sales_col], errors='coerce').fillna(0)
+        if payout_col in df.columns:
+            df[payout_col] = pd.to_numeric(df[payout_col], errors='coerce').fillna(0)
+        
+        # Aggregate by date and store
+        sales_agg = df.groupby([date_col, store_col])[sales_col].sum().reset_index() if sales_col in df.columns else pd.DataFrame()
+        payouts_agg = df.groupby([date_col, store_col])[payout_col].sum().reset_index() if payout_col in df.columns else pd.DataFrame()
+        orders_agg = df.groupby([date_col, store_col])[order_col].nunique().reset_index() if order_col in df.columns else pd.DataFrame()
+        
+        # Pivot: Date as index, Store ID as columns
+        if not sales_agg.empty:
+            sales_pivot = sales_agg.pivot_table(index=date_col, columns=store_col, values=sales_col, aggfunc='sum', fill_value=0)
+            sales_pivot.index = sales_pivot.index.strftime('%Y-%m-%d')
+            sales_csv = sales_pivot.to_csv()
+            zip_file.writestr(f"{platform}_{period}_Sales.csv", sales_csv)
+        
+        if not payouts_agg.empty:
+            payouts_pivot = payouts_agg.pivot_table(index=date_col, columns=store_col, values=payout_col, aggfunc='sum', fill_value=0)
+            payouts_pivot.index = payouts_pivot.index.strftime('%Y-%m-%d')
+            payouts_csv = payouts_pivot.to_csv()
+            zip_file.writestr(f"{platform}_{period}_Payouts.csv", payouts_csv)
+        
+        if not orders_agg.empty:
+            orders_pivot = orders_agg.pivot_table(index=date_col, columns=store_col, values=order_col, aggfunc='sum', fill_value=0)
+            orders_pivot.index = orders_pivot.index.strftime('%Y-%m-%d')
+            orders_csv = orders_pivot.to_csv()
+            zip_file.writestr(f"{platform}_{period}_Orders.csv", orders_csv)
+    
+    except Exception as e:
+        st.warning(f"Error processing {platform} {period}: {str(e)}")

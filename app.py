@@ -15,7 +15,7 @@ from data_processing import load_and_aggregate_ue_data, load_and_aggregate_dd_da
 from marketing_analysis import create_corporate_vs_todc_table
 from table_generation import create_summary_tables, create_combined_summary_tables, create_combined_store_tables, get_platform_store_tables, get_platform_summary_tables
 from ui_components import create_store_selector, display_store_tables, display_summary_tables, display_platform_data
-from export_functions import export_to_excel, create_date_export
+from export_functions import export_to_excel, create_date_export, create_date_export_from_master_files
 from file_upload_screen import display_file_upload_screen
 
 # Set page config - Ensure sidebar is expanded by default
@@ -589,13 +589,11 @@ def main():
     
     # Export buttons at the top
     st.subheader("📥 Export Data")
-    col1, col2, col3 = st.columns(3)
+    col1, col2 = st.columns(2)
     with col1:
         export_clicked = st.button("📊 Export All Tables to Excel", type="primary", width='stretch', key="export_excel")
     with col2:
         date_export_clicked = st.button("📅 Date Export", type="primary", width='stretch', key="export_date")
-    with col3:
-        dataset_export_clicked = st.button("📦 Export Dataset", type="primary", width='stretch', key="export_dataset")
     
     st.divider()
     
@@ -623,13 +621,41 @@ def main():
     )
     
     # Handle exports immediately after data is ready
-    # Date Export functionality - DISABLED: Legacy file paths no longer exist
-    # We now use master files (dd-data.csv, ue-data.csv) with date range filtering
+    # Date Export functionality
     if date_export_clicked:
-        st.warning("⚠️ Date Export functionality is currently disabled. We now use master files with date range filtering instead of legacy pre/post files.")
-        # TODO: Re-implement date export using master files if needed
+        if not (pre_start and pre_end and post_start and post_end):
+            st.error("❌ **Date ranges required!** Please set Pre and Post date ranges in the sidebar.")
+        else:
+            try:
+                with st.spinner("🔄 Creating date-wise export..."):
+                    zip_bytes, zip_filename = create_date_export_from_master_files(
+                        dd_data_path=dd_data_path,
+                        ue_data_path=ue_data_path,
+                        pre_start_date=pre_start,
+                        pre_end_date=pre_end,
+                        post_start_date=post_start,
+                        post_end_date=post_end,
+                        excluded_dates=excluded_dates
+                    )
+                    if zip_bytes and zip_filename:
+                        st.success(f"✅ **Date Export successful!** Downloading zip file...")
+                        st.download_button(
+                            label="📥 Download Date Export (ZIP)",
+                            data=zip_bytes,
+                            file_name=zip_filename,
+                            mime="application/zip",
+                            type="primary",
+                            width='stretch'
+                        )
+                    else:
+                        st.error("❌ **Date Export failed!** Please check your data files and date ranges.")
+            except Exception as e:
+                st.error(f"❌ **Date Export failed!** Error: {str(e)}")
+                import traceback
+                with st.expander("🔍 View Error Details"):
+                    st.code(traceback.format_exc())
     
-    # Export All Tables to Excel
+    # Export All Tables to Excel - Direct download
     if export_clicked:
         try:
             with st.spinner("🔄 Exporting all tables to Excel..."):
@@ -644,7 +670,7 @@ def main():
                     promotion_table=promotion_table,
                     sponsored_table=sponsored_table
                 )
-                st.success(f"✅ **Export successful!** Click the button below to download the file.")
+                st.success(f"✅ **Export successful!** Downloading file...")
                 st.download_button(
                     label="📥 Download Excel File",
                     data=file_bytes,
@@ -659,53 +685,6 @@ def main():
             with st.expander("🔍 View Error Details"):
                 st.code(traceback.format_exc())
     
-    # Export Dataset (all root folder files except app)
-    if dataset_export_clicked:
-        try:
-            with st.spinner("🔄 Exporting dataset to Google Drive..."):
-                drive_manager = get_drive_manager()
-                if not drive_manager:
-                    st.error("❌ **Google Drive not initialized!** Please check your service account credentials.")
-                else:
-                    root_folder_name = ROOT_DIR.name  # Get root folder name (e.g., "BigGee-Jan")
-                    
-                    # Upload all files from root directory (excluding app folder)
-                    result = drive_manager.upload_directory(
-                        directory_path=ROOT_DIR,
-                        root_folder_name=root_folder_name,
-                        subfolder_name="datasets",
-                        exclude_dirs=["app"]
-                    )
-                    
-                    # Display results
-                    if result['success_count'] > 0:
-                        st.success(f"✅ **Dataset Export successful!** Uploaded {result['success_count']} out of {result['total_count']} files to Google Drive.")
-                        
-                        # Show uploaded files in an expander
-                        with st.expander(f"📋 View {result['success_count']} Uploaded Files"):
-                            for file_info in result['uploaded_files'][:50]:  # Show first 50 files
-                                st.markdown(f"- [{file_info['name']}]({file_info['webViewLink']})")
-                            if len(result['uploaded_files']) > 50:
-                                st.info(f"... and {len(result['uploaded_files']) - 50} more files")
-                        
-                        # Show failed files if any
-                        if result['failed_count'] > 0:
-                            st.warning(f"⚠️ **{result['failed_count']} files failed to upload:**")
-                            with st.expander("🔍 View Failed Files"):
-                                for file_info in result['failed_files']:
-                                    st.error(f"❌ {file_info['name']}: {file_info['error']}")
-                    else:
-                        st.warning("⚠️ **No files were uploaded.** Please check if there are files in the root directory.")
-                    
-                    # Show folder location
-                    st.info(f"📁 Files uploaded to: `{root_folder_name}/datasets/` in Google Drive")
-                    
-        except Exception as e:
-            st.error(f"❌ **Dataset Export failed!** Error: {str(e)}")
-            import traceback
-            with st.expander("🔍 View Error Details"):
-                st.code(traceback.format_exc())
-    
     # 1. Combined Store-Level Tables
     st.header("🔗 Combined Store-Level Analysis (DoorDash + UberEats)")
     st.caption("💡 Values are summed for stores that appear in both platforms")
@@ -716,9 +695,12 @@ def main():
         if 'Pre' in combined_store1_display.columns and 'Post' in combined_store1_display.columns:
             combined_store1_display = combined_store1_display[
                 (combined_store1_display['Pre'].fillna(0) != 0) | (combined_store1_display['Post'].fillna(0) != 0)
-            ]
+            ].copy()  # Use .copy() to ensure we have a clean dataframe
         # Only display if there's data after filtering
         if not combined_store1_display.empty and 'Pre' in combined_store1_display.columns:
+            # Reset index to ensure clean row numbers
+            if 'Store ID' in combined_store1_display.columns:
+                combined_store1_display = combined_store1_display.reset_index(drop=True)
             if 'Pre' in combined_store1_display.columns:
                 combined_store1_display['Pre'] = combined_store1_display['Pre'].apply(lambda x: f"${x:,.1f}" if isinstance(x, (int, float)) else x)
             if 'Post' in combined_store1_display.columns:
@@ -744,10 +726,12 @@ def main():
         if 'last year-post' in combined_store2_display.columns and 'post' in combined_store2_display.columns:
             combined_store2_display = combined_store2_display[
                 (combined_store2_display['last year-post'].fillna(0) != 0) | (combined_store2_display['post'].fillna(0) != 0)
-            ]
+            ].copy()  # Use .copy() to ensure we have a clean dataframe
         
         # Only display if there's data after filtering
         if not combined_store2_display.empty:
+            # Reset index to ensure clean row numbers
+            combined_store2_display = combined_store2_display.reset_index(drop=True) if 'Store ID' in combined_store2_display.columns else combined_store2_display
             # Format dollar columns
             if 'last year-post' in combined_store2_display.columns:
                 combined_store2_display['last year-post'] = combined_store2_display['last year-post'].apply(lambda x: f"${x:,.1f}" if isinstance(x, (int, float)) else x)

@@ -95,25 +95,82 @@ def create_summary_tables(sales_df, payouts_df, orders_df, new_customers_df, sel
         if isinstance(new_customers_summary[key], (int, float)):
             new_customers_summary[key] = round(new_customers_summary[key], 1)
     
+    # Calculate Profitability (Payouts/Sales%) and AOV (Sales/Orders)
+    # Profitability: Pre
+    profitability_pre = (payouts_summary['pre_25'] / sales_summary['pre_25'] * 100) if sales_summary['pre_25'] != 0 else 0
+    # Profitability: Post
+    profitability_post = (payouts_summary['post_25'] / sales_summary['post_25'] * 100) if sales_summary['post_25'] != 0 else 0
+    # Profitability: PrevsPost
+    profitability_prevs_post = profitability_post - profitability_pre
+    # Profitability: LastYear Pre vs Post
+    profitability_last_year_pre = (payouts_summary['pre_24'] / sales_summary['pre_24'] * 100) if sales_summary['pre_24'] != 0 else 0
+    profitability_last_year_post = (payouts_summary['post_24'] / sales_summary['post_24'] * 100) if sales_summary['post_24'] != 0 else 0
+    profitability_last_year_prevs_post = profitability_last_year_post - profitability_last_year_pre
+    # Profitability: Growth%
+    profitability_growth = (profitability_prevs_post / profitability_pre * 100) if profitability_pre != 0 else 0
+    # Profitability: YoY
+    profitability_yoy = profitability_post - profitability_last_year_post
+    # Profitability: YoY%
+    profitability_yoy_pct = (profitability_yoy / profitability_last_year_post * 100) if profitability_last_year_post != 0 else 0
+    
+    profitability_summary = {
+        'pre_25': round(profitability_pre, 1),
+        'post_25': round(profitability_post, 1),
+        'PrevsPost': round(profitability_prevs_post, 1),
+        'LastYear_Pre_vs_Post': round(profitability_last_year_prevs_post, 1),
+        'post_24': round(profitability_last_year_post, 1),
+        'YoY': round(profitability_yoy, 1),
+        'Growth%': round(profitability_growth, 1),
+        'YoY%': round(profitability_yoy_pct, 1)
+    }
+    
+    # AOV: Pre
+    aov_pre = (sales_summary['pre_25'] / orders_summary['pre_25']) if orders_summary['pre_25'] != 0 else 0
+    # AOV: Post
+    aov_post = (sales_summary['post_25'] / orders_summary['post_25']) if orders_summary['post_25'] != 0 else 0
+    # AOV: PrevsPost
+    aov_prevs_post = aov_post - aov_pre
+    # AOV: LastYear Pre vs Post
+    aov_last_year_pre = (sales_summary['pre_24'] / orders_summary['pre_24']) if orders_summary['pre_24'] != 0 else 0
+    aov_last_year_post = (sales_summary['post_24'] / orders_summary['post_24']) if orders_summary['post_24'] != 0 else 0
+    aov_last_year_prevs_post = aov_last_year_post - aov_last_year_pre
+    # AOV: Growth%
+    aov_growth = (aov_prevs_post / aov_pre * 100) if aov_pre != 0 else 0
+    # AOV: YoY
+    aov_yoy = aov_post - aov_last_year_post
+    # AOV: YoY%
+    aov_yoy_pct = (aov_yoy / aov_last_year_post * 100) if aov_last_year_post != 0 else 0
+    
+    aov_summary = {
+        'pre_25': round(aov_pre, 1),
+        'post_25': round(aov_post, 1),
+        'PrevsPost': round(aov_prevs_post, 1),
+        'LastYear_Pre_vs_Post': round(aov_last_year_prevs_post, 1),
+        'post_24': round(aov_last_year_post, 1),
+        'YoY': round(aov_yoy, 1),
+        'Growth%': round(aov_growth, 1),
+        'YoY%': round(aov_yoy_pct, 1)
+    }
+    
     # Create Table 1: Pre vs Post
     table1_data = {
-        'Metric': ['Sales', 'Payouts', 'Orders', 'New Customers'],
-        'Pre': [sales_summary['pre_25'], payouts_summary['pre_25'], orders_summary['pre_25'], new_customers_summary['pre_25']],
-        'Post': [sales_summary['post_25'], payouts_summary['post_25'], orders_summary['post_25'], new_customers_summary['post_25']],
-        'PrevsPost': [sales_summary['PrevsPost'], payouts_summary['PrevsPost'], orders_summary['PrevsPost'], new_customers_summary['PrevsPost']],
-        'LastYear Pre vs Post': [sales_summary['LastYear_Pre_vs_Post'], payouts_summary['LastYear_Pre_vs_Post'], orders_summary['LastYear_Pre_vs_Post'], new_customers_summary['LastYear_Pre_vs_Post']],
-        'Growth%': [sales_summary['Growth%'], payouts_summary['Growth%'], orders_summary['Growth%'], new_customers_summary['Growth%']]
+        'Metric': ['Sales', 'Payouts', 'Orders', 'New Customers', 'Profitability', 'AOV'],
+        'Pre': [sales_summary['pre_25'], payouts_summary['pre_25'], orders_summary['pre_25'], new_customers_summary['pre_25'], profitability_summary['pre_25'], aov_summary['pre_25']],
+        'Post': [sales_summary['post_25'], payouts_summary['post_25'], orders_summary['post_25'], new_customers_summary['post_25'], profitability_summary['post_25'], aov_summary['post_25']],
+        'PrevsPost': [sales_summary['PrevsPost'], payouts_summary['PrevsPost'], orders_summary['PrevsPost'], new_customers_summary['PrevsPost'], profitability_summary['PrevsPost'], aov_summary['PrevsPost']],
+        'LastYear Pre vs Post': [sales_summary['LastYear_Pre_vs_Post'], payouts_summary['LastYear_Pre_vs_Post'], orders_summary['LastYear_Pre_vs_Post'], new_customers_summary['LastYear_Pre_vs_Post'], profitability_summary['LastYear_Pre_vs_Post'], aov_summary['LastYear_Pre_vs_Post']],
+        'Growth%': [sales_summary['Growth%'], payouts_summary['Growth%'], orders_summary['Growth%'], new_customers_summary['Growth%'], profitability_summary['Growth%'], aov_summary['Growth%']]
     }
     table1_df = pd.DataFrame(table1_data)
     table1_df = table1_df.set_index('Metric')
     
     # Create Table 2: YoY
     table2_data = {
-        'Metric': ['Sales', 'Payouts', 'Orders', 'New Customers'],
-        'last year-post': [sales_summary['post_24'], payouts_summary['post_24'], orders_summary['post_24'], new_customers_summary['post_24']],
-        'post': [sales_summary['post_25'], payouts_summary['post_25'], orders_summary['post_25'], new_customers_summary['post_25']],
-        'YoY': [sales_summary['YoY'], payouts_summary['YoY'], orders_summary['YoY'], new_customers_summary['YoY']],
-        'YoY%': [sales_summary['YoY%'], payouts_summary['YoY%'], orders_summary['YoY%'], new_customers_summary['YoY%']]
+        'Metric': ['Sales', 'Payouts', 'Orders', 'New Customers', 'Profitability', 'AOV'],
+        'last year-post': [sales_summary['post_24'], payouts_summary['post_24'], orders_summary['post_24'], new_customers_summary['post_24'], profitability_summary['post_24'], aov_summary['post_24']],
+        'post': [sales_summary['post_25'], payouts_summary['post_25'], orders_summary['post_25'], new_customers_summary['post_25'], profitability_summary['post_25'], aov_summary['post_25']],
+        'YoY': [sales_summary['YoY'], payouts_summary['YoY'], orders_summary['YoY'], new_customers_summary['YoY'], profitability_summary['YoY'], aov_summary['YoY']],
+        'YoY%': [sales_summary['YoY%'], payouts_summary['YoY%'], orders_summary['YoY%'], new_customers_summary['YoY%'], profitability_summary['YoY%'], aov_summary['YoY%']]
     }
     table2_df = pd.DataFrame(table2_data)
     table2_df = table2_df.set_index('Metric')
@@ -215,25 +272,82 @@ def create_combined_summary_tables(dd_sales_df, dd_payouts_df, dd_orders_df, dd_
         if isinstance(combined_new_customers[key], (int, float)):
             combined_new_customers[key] = round(combined_new_customers[key], 1)
     
+    # Calculate Profitability (Payouts/Sales%) and AOV (Sales/Orders)
+    # Profitability: Pre
+    profitability_pre = (combined_payouts['pre_25'] / combined_sales['pre_25'] * 100) if combined_sales['pre_25'] != 0 else 0
+    # Profitability: Post
+    profitability_post = (combined_payouts['post_25'] / combined_sales['post_25'] * 100) if combined_sales['post_25'] != 0 else 0
+    # Profitability: PrevsPost
+    profitability_prevs_post = profitability_post - profitability_pre
+    # Profitability: LastYear Pre vs Post
+    profitability_last_year_pre = (combined_payouts['pre_24'] / combined_sales['pre_24'] * 100) if combined_sales['pre_24'] != 0 else 0
+    profitability_last_year_post = (combined_payouts['post_24'] / combined_sales['post_24'] * 100) if combined_sales['post_24'] != 0 else 0
+    profitability_last_year_prevs_post = profitability_last_year_post - profitability_last_year_pre
+    # Profitability: Growth%
+    profitability_growth = (profitability_prevs_post / profitability_pre * 100) if profitability_pre != 0 else 0
+    # Profitability: YoY
+    profitability_yoy = profitability_post - profitability_last_year_post
+    # Profitability: YoY%
+    profitability_yoy_pct = (profitability_yoy / profitability_last_year_post * 100) if profitability_last_year_post != 0 else 0
+    
+    profitability_summary = {
+        'pre_25': round(profitability_pre, 1),
+        'post_25': round(profitability_post, 1),
+        'PrevsPost': round(profitability_prevs_post, 1),
+        'LastYear_Pre_vs_Post': round(profitability_last_year_prevs_post, 1),
+        'post_24': round(profitability_last_year_post, 1),
+        'YoY': round(profitability_yoy, 1),
+        'Growth%': round(profitability_growth, 1),
+        'YoY%': round(profitability_yoy_pct, 1)
+    }
+    
+    # AOV: Pre
+    aov_pre = (combined_sales['pre_25'] / combined_orders['pre_25']) if combined_orders['pre_25'] != 0 else 0
+    # AOV: Post
+    aov_post = (combined_sales['post_25'] / combined_orders['post_25']) if combined_orders['post_25'] != 0 else 0
+    # AOV: PrevsPost
+    aov_prevs_post = aov_post - aov_pre
+    # AOV: LastYear Pre vs Post
+    aov_last_year_pre = (combined_sales['pre_24'] / combined_orders['pre_24']) if combined_orders['pre_24'] != 0 else 0
+    aov_last_year_post = (combined_sales['post_24'] / combined_orders['post_24']) if combined_orders['post_24'] != 0 else 0
+    aov_last_year_prevs_post = aov_last_year_post - aov_last_year_pre
+    # AOV: Growth%
+    aov_growth = (aov_prevs_post / aov_pre * 100) if aov_pre != 0 else 0
+    # AOV: YoY
+    aov_yoy = aov_post - aov_last_year_post
+    # AOV: YoY%
+    aov_yoy_pct = (aov_yoy / aov_last_year_post * 100) if aov_last_year_post != 0 else 0
+    
+    aov_summary = {
+        'pre_25': round(aov_pre, 1),
+        'post_25': round(aov_post, 1),
+        'PrevsPost': round(aov_prevs_post, 1),
+        'LastYear_Pre_vs_Post': round(aov_last_year_prevs_post, 1),
+        'post_24': round(aov_last_year_post, 1),
+        'YoY': round(aov_yoy, 1),
+        'Growth%': round(aov_growth, 1),
+        'YoY%': round(aov_yoy_pct, 1)
+    }
+    
     # Create Table 1: Pre vs Post
     table1_data = {
-        'Metric': ['Sales', 'Payouts', 'Orders', 'New Customers'],
-        'Pre': [combined_sales['pre_25'], combined_payouts['pre_25'], combined_orders['pre_25'], combined_new_customers['pre_25']],
-        'Post': [combined_sales['post_25'], combined_payouts['post_25'], combined_orders['post_25'], combined_new_customers['post_25']],
-        'PrevsPost': [combined_sales['PrevsPost'], combined_payouts['PrevsPost'], combined_orders['PrevsPost'], combined_new_customers['PrevsPost']],
-        'LastYear Pre vs Post': [combined_sales['LastYear_Pre_vs_Post'], combined_payouts['LastYear_Pre_vs_Post'], combined_orders['LastYear_Pre_vs_Post'], combined_new_customers['LastYear_Pre_vs_Post']],
-        'Growth%': [combined_sales['Growth%'], combined_payouts['Growth%'], combined_orders['Growth%'], combined_new_customers['Growth%']]
+        'Metric': ['Sales', 'Payouts', 'Orders', 'New Customers', 'Profitability', 'AOV'],
+        'Pre': [combined_sales['pre_25'], combined_payouts['pre_25'], combined_orders['pre_25'], combined_new_customers['pre_25'], profitability_summary['pre_25'], aov_summary['pre_25']],
+        'Post': [combined_sales['post_25'], combined_payouts['post_25'], combined_orders['post_25'], combined_new_customers['post_25'], profitability_summary['post_25'], aov_summary['post_25']],
+        'PrevsPost': [combined_sales['PrevsPost'], combined_payouts['PrevsPost'], combined_orders['PrevsPost'], combined_new_customers['PrevsPost'], profitability_summary['PrevsPost'], aov_summary['PrevsPost']],
+        'LastYear Pre vs Post': [combined_sales['LastYear_Pre_vs_Post'], combined_payouts['LastYear_Pre_vs_Post'], combined_orders['LastYear_Pre_vs_Post'], combined_new_customers['LastYear_Pre_vs_Post'], profitability_summary['LastYear_Pre_vs_Post'], aov_summary['LastYear_Pre_vs_Post']],
+        'Growth%': [combined_sales['Growth%'], combined_payouts['Growth%'], combined_orders['Growth%'], combined_new_customers['Growth%'], profitability_summary['Growth%'], aov_summary['Growth%']]
     }
     table1_df = pd.DataFrame(table1_data)
     table1_df = table1_df.set_index('Metric')
     
     # Create Table 2: YoY
     table2_data = {
-        'Metric': ['Sales', 'Payouts', 'Orders', 'New Customers'],
-        'last year-post': [combined_sales['post_24'], combined_payouts['post_24'], combined_orders['post_24'], combined_new_customers['post_24']],
-        'post': [combined_sales['post_25'], combined_payouts['post_25'], combined_orders['post_25'], combined_new_customers['post_25']],
-        'YoY': [combined_sales['YoY'], combined_payouts['YoY'], combined_orders['YoY'], combined_new_customers['YoY']],
-        'YoY%': [combined_sales['YoY%'], combined_payouts['YoY%'], combined_orders['YoY%'], combined_new_customers['YoY%']]
+        'Metric': ['Sales', 'Payouts', 'Orders', 'New Customers', 'Profitability', 'AOV'],
+        'last year-post': [combined_sales['post_24'], combined_payouts['post_24'], combined_orders['post_24'], combined_new_customers['post_24'], profitability_summary['post_24'], aov_summary['post_24']],
+        'post': [combined_sales['post_25'], combined_payouts['post_25'], combined_orders['post_25'], combined_new_customers['post_25'], profitability_summary['post_25'], aov_summary['post_25']],
+        'YoY': [combined_sales['YoY'], combined_payouts['YoY'], combined_orders['YoY'], combined_new_customers['YoY'], profitability_summary['YoY'], aov_summary['YoY']],
+        'YoY%': [combined_sales['YoY%'], combined_payouts['YoY%'], combined_orders['YoY%'], combined_new_customers['YoY%'], profitability_summary['YoY%'], aov_summary['YoY%']]
     }
     table2_df = pd.DataFrame(table2_data)
     table2_df = table2_df.set_index('Metric')

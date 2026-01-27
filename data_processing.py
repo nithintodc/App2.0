@@ -339,6 +339,7 @@ def load_and_aggregate_new_customers(excluded_dates=None, pre_start_date=None, p
         # Convert Store ID to string to match other dataframes
         new_customers_agg['Store ID'] = new_customers_agg['Store ID'].astype(str)
         
+
         return new_customers_agg
     
     # Process DoorDash new customers from marketing_promotion files for each period
