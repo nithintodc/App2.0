@@ -46,7 +46,8 @@ def extract_file_info(file_path, file_type):
                     break
         elif file_type == 'ue':
             # Try multiple possible column names for UE (case-insensitive matching)
-            possible_cols = ['Order Date', 'Order date', 'order date', 'order Date', 'Date', 'date', 'Order Date (Local)']
+            from utils import UE_DATE_COLUMN_VARIATIONS
+            possible_cols = UE_DATE_COLUMN_VARIATIONS + ['Order Date (Local)']
             for col in df.columns:
                 col_lower = col.lower().strip()
                 # Try exact match first

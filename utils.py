@@ -2,6 +2,11 @@
 import pandas as pd
 import streamlit as st
 
+# Constants for date column name variations
+UE_DATE_COLUMN_VARIATIONS = ['Order Date', 'Order date', 'order date', 'order Date', 'Date', 'date']
+DD_DATE_COLUMN_VARIATIONS = ['Timestamp local date', 'Timestamp Local Date', 'Timestamp Local date', 
+                              'timestamp local date', 'Date', 'date', 'Timestamp', 'timestamp']
+
 
 def normalize_store_id_column(df):
     """
@@ -137,11 +142,10 @@ def filter_master_file_by_date_range(file_path, start_date, end_date, date_col_n
             preferred_names = [date_col_name]
             # For UE files, also try common variations
             if 'ue' in file_path.name.lower():
-                preferred_names = ['Order Date', 'Order date', 'order date', 'order Date', 'Date', 'date']
+                preferred_names = UE_DATE_COLUMN_VARIATIONS
             # For DD files, try common variations of "Timestamp local date"
             elif 'dd' in file_path.name.lower() or 'doordash' in file_path.name.lower():
-                preferred_names = ['Timestamp local date', 'Timestamp Local Date', 'Timestamp Local date', 
-                                  'timestamp local date', 'Date', 'date', 'Timestamp', 'timestamp']
+                preferred_names = DD_DATE_COLUMN_VARIATIONS
         else:
             preferred_names = date_col_name
         

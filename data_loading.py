@@ -3,7 +3,7 @@ import pandas as pd
 import streamlit as st
 from pathlib import Path
 from config import DD_DATA_MASTER, UE_DATA_MASTER, ROOT_DIR
-from utils import filter_master_file_by_date_range, normalize_store_id_column, find_date_column
+from utils import filter_master_file_by_date_range, normalize_store_id_column, find_date_column, UE_DATE_COLUMN_VARIATIONS
 
 
 def process_master_file_for_dd(file_path, start_date, end_date, excluded_dates=None):
@@ -105,7 +105,7 @@ def process_master_file_for_ue(file_path, start_date, end_date, excluded_dates=N
         # Load and filter by date range using "Order date" column (case-insensitive matching)
         # Try all common variations: "Order Date", "Order date", "order date", "order Date"
         df = filter_master_file_by_date_range(file_path, start_date, end_date, 
-                                               ['Order Date', 'Order date', 'order date', 'order Date', 'Date', 'date'], 
+                                               UE_DATE_COLUMN_VARIATIONS, 
                                                excluded_dates)
         
         if df.empty:

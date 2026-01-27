@@ -10,7 +10,7 @@ from openpyxl.styles import Alignment, Font
 from openpyxl.utils import get_column_letter
 from config import ROOT_DIR
 from gdrive_utils import get_drive_manager
-from utils import normalize_store_id_column, filter_master_file_by_date_range
+from utils import normalize_store_id_column, filter_master_file_by_date_range, UE_DATE_COLUMN_VARIATIONS
 from table_generation import create_summary_tables
 from data_processing import get_last_year_dates
 
@@ -376,7 +376,7 @@ def create_date_export(dd_pre_24_path, dd_post_24_path, dd_pre_25_path, dd_post_
             # Find "Order Date" column for UE (case-insensitive matching)
             # Try all common variations: "Order Date", "Order date", "order date", "order Date"
             date_col = None
-            preferred_names = ['Order Date', 'Order date', 'order date', 'order Date', 'Date', 'date']
+            preferred_names = UE_DATE_COLUMN_VARIATIONS
             
             # First try exact match
             for name in preferred_names:
@@ -395,7 +395,7 @@ def create_date_export(dd_pre_24_path, dd_post_24_path, dd_pre_25_path, dd_post_
             
             if date_col is None:
                 st.warning(f"Date column not found in UE file. Available columns: {list(df.columns)[:10]}")
-                date_col = 'Order Date'  # Default fallback (may cause error if not present)
+                date_col = UE_DATE_COLUMN_VARIATIONS[0]  # Default fallback (may cause error if not present)
             
             sales_col = 'Sales (excl. tax)'
             payout_col = 'Total payout'
@@ -562,11 +562,11 @@ def create_date_export_from_master_files(dd_data_path, ue_data_path, pre_start_d
                 ]
                 
                 for period_name, start_date, end_date in periods:
-                    df = filter_master_file_by_date_range(
-                        Path(ue_data_path), start_date, end_date,
-                        ['Order Date', 'Order date', 'order date', 'order Date', 'Date', 'date'],
-                        excluded_dates
-                    )
+                df = filter_master_file_by_date_range(
+                    Path(ue_data_path), start_date, end_date,
+                    UE_DATE_COLUMN_VARIATIONS,
+                    excluded_dates
+                )
                     if not df.empty:
                         df, store_col = normalize_store_id_column(df)
                         excel_bytes = _create_period_excel_file(df, 'UE', period_name, store_col, 'Sales (excl. tax)', 'Total payout', 'Order ID')
@@ -612,7 +612,7 @@ def _create_period_excel_file(df, platform, period_name, store_col, sales_col, p
                     date_col = col
                     break
         else:  # UE
-            for col in ['Order Date', 'Order date', 'order date', 'order Date', 'Date', 'date']:
+            for col in UE_DATE_COLUMN_VARIATIONS:
                 if col in df.columns:
                     date_col = col
                     break
