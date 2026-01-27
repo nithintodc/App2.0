@@ -80,18 +80,25 @@ def export_to_excel(dd_table1, dd_table2, ue_table1, ue_table2,
             is_orders_row = False
             is_new_customers_row = False
             metric_value = ''  # Initialize metric_value
+            
+            # Try to get metric value from column first (after reset_index, Metric becomes a column)
             if 'Metric' in df_display.columns:
-                metric_value = row_data.get('Metric', '')
+                try:
+                    metric_val = row_data['Metric']
+                    metric_value = str(metric_val) if pd.notna(metric_val) else ''
+                except (KeyError, IndexError, TypeError):
+                    metric_value = ''
+                
                 if metric_value == 'Orders':
                     is_orders_row = True
                 elif metric_value == 'New Customers':
                     is_new_customers_row = True
-            # Also check if Metric is in the index (for summary tables with Metric as index)
-            elif hasattr(df, 'index') and df.index.name == 'Metric':
-                metric_value = str(row_idx) if row_idx in df.index else ''
-            # If df_display has index with name 'Metric', use that
-            elif hasattr(df_display, 'index') and df_display.index.name == 'Metric':
-                metric_value = str(row_idx) if row_idx in df_display.index else ''
+            # If Metric is still in the index (wasn't reset), use row_idx directly
+            elif df_display.index.name == 'Metric':
+                metric_value = str(row_idx) if pd.notna(row_idx) else ''
+            # Last resort: if row_idx itself is the metric name (string)
+            elif isinstance(row_idx, str):
+                metric_value = str(row_idx)
             
             for col_idx, col_name in enumerate(df_display.columns, start=1):
                 value = row_data[col_name]
