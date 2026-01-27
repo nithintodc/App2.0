@@ -628,7 +628,7 @@ def main():
         else:
             try:
                 with st.spinner("🔄 Creating date-wise export..."):
-                    zip_bytes, zip_filename = create_date_export_from_master_files(
+                    excel_bytes, excel_filename = create_date_export_from_master_files(
                         dd_data_path=dd_data_path,
                         ue_data_path=ue_data_path,
                         pre_start_date=pre_start,
@@ -637,12 +637,12 @@ def main():
                         post_end_date=post_end,
                         excluded_dates=excluded_dates
                     )
-                    if zip_bytes and zip_filename:
-                        st.success(f"✅ **Date Export successful!** Downloading zip file...")
+                    if excel_bytes and excel_filename:
+                        st.success(f"✅ **Date Export successful!** Downloading zip file with 8 Excel files...")
                         st.download_button(
                             label="📥 Download Date Export (ZIP)",
-                            data=zip_bytes,
-                            file_name=zip_filename,
+                            data=excel_bytes,
+                            file_name=excel_filename,
                             mime="application/zip",
                             type="primary",
                             width='stretch'
@@ -783,6 +783,18 @@ def main():
             combined_summary1_display.loc[idx, 'Post'] = f"{int(round(combined_summary1.loc[idx, 'Post'])):,}"
             combined_summary1_display.loc[idx, 'PrevsPost'] = f"{int(round(combined_summary1.loc[idx, 'PrevsPost'])):,}"
             combined_summary1_display.loc[idx, 'LastYear Pre vs Post'] = f"{int(round(combined_summary1.loc[idx, 'LastYear Pre vs Post'])):,}"
+        elif metric == 'Profitability':
+            # Profitability: format as percentage
+            combined_summary1_display.loc[idx, 'Pre'] = f"{combined_summary1.loc[idx, 'Pre']:.1f}%"
+            combined_summary1_display.loc[idx, 'Post'] = f"{combined_summary1.loc[idx, 'Post']:.1f}%"
+            combined_summary1_display.loc[idx, 'PrevsPost'] = f"{combined_summary1.loc[idx, 'PrevsPost']:.1f}%"
+            combined_summary1_display.loc[idx, 'LastYear Pre vs Post'] = f"{combined_summary1.loc[idx, 'LastYear Pre vs Post']:.1f}%"
+        elif metric == 'AOV':
+            # AOV: format as dollars
+            combined_summary1_display.loc[idx, 'Pre'] = f"${combined_summary1.loc[idx, 'Pre']:,.1f}"
+            combined_summary1_display.loc[idx, 'Post'] = f"${combined_summary1.loc[idx, 'Post']:,.1f}"
+            combined_summary1_display.loc[idx, 'PrevsPost'] = f"${combined_summary1.loc[idx, 'PrevsPost']:,.1f}"
+            combined_summary1_display.loc[idx, 'LastYear Pre vs Post'] = f"${combined_summary1.loc[idx, 'LastYear Pre vs Post']:,.1f}"
         else:
             combined_summary1_display.loc[idx, 'Pre'] = f"${combined_summary1.loc[idx, 'Pre']:,.1f}"
             combined_summary1_display.loc[idx, 'Post'] = f"${combined_summary1.loc[idx, 'Post']:,.1f}"
@@ -810,6 +822,16 @@ def main():
             combined_summary2_display.loc[idx, 'last year-post'] = f"{int(round(combined_summary2.loc[idx, 'last year-post'])):,}"
             combined_summary2_display.loc[idx, 'post'] = f"{int(round(combined_summary2.loc[idx, 'post'])):,}"
             combined_summary2_display.loc[idx, 'YoY'] = f"{int(round(combined_summary2.loc[idx, 'YoY'])):,}"
+        elif metric == 'Profitability':
+            # Profitability: format as percentage
+            combined_summary2_display.loc[idx, 'last year-post'] = f"{combined_summary2.loc[idx, 'last year-post']:.1f}%"
+            combined_summary2_display.loc[idx, 'post'] = f"{combined_summary2.loc[idx, 'post']:.1f}%"
+            combined_summary2_display.loc[idx, 'YoY'] = f"{combined_summary2.loc[idx, 'YoY']:.1f}%"
+        elif metric == 'AOV':
+            # AOV: format as dollars
+            combined_summary2_display.loc[idx, 'last year-post'] = f"${combined_summary2.loc[idx, 'last year-post']:,.1f}"
+            combined_summary2_display.loc[idx, 'post'] = f"${combined_summary2.loc[idx, 'post']:,.1f}"
+            combined_summary2_display.loc[idx, 'YoY'] = f"${combined_summary2.loc[idx, 'YoY']:,.1f}"
         else:
             combined_summary2_display.loc[idx, 'last year-post'] = f"${combined_summary2.loc[idx, 'last year-post']:,.1f}"
             combined_summary2_display.loc[idx, 'post'] = f"${combined_summary2.loc[idx, 'post']:,.1f}"

@@ -79,12 +79,19 @@ def export_to_excel(dd_table1, dd_table2, ue_table1, ue_table2,
             # Check if this row is for Orders or New Customers (for summary tables)
             is_orders_row = False
             is_new_customers_row = False
+            metric_value = ''  # Initialize metric_value
             if 'Metric' in df_display.columns:
                 metric_value = row_data.get('Metric', '')
                 if metric_value == 'Orders':
                     is_orders_row = True
                 elif metric_value == 'New Customers':
                     is_new_customers_row = True
+            # Also check if Metric is in the index (for summary tables with Metric as index)
+            elif hasattr(df, 'index') and df.index.name == 'Metric':
+                metric_value = str(row_idx) if row_idx in df.index else ''
+            # If df_display has index with name 'Metric', use that
+            elif hasattr(df_display, 'index') and df_display.index.name == 'Metric':
+                metric_value = str(row_idx) if row_idx in df_display.index else ''
             
             for col_idx, col_name in enumerate(df_display.columns, start=1):
                 value = row_data[col_name]
@@ -494,8 +501,8 @@ def create_date_export(dd_pre_24_path, dd_post_24_path, dd_pre_25_path, dd_post_
 def create_date_export_from_master_files(dd_data_path, ue_data_path, pre_start_date, pre_end_date, post_start_date, post_end_date, excluded_dates=None):
     """
     Create date-wise exports of DD and UE financial data.
-    Exports sales, payouts, orders store-wise for each date in the date ranges.
-    Returns a zip file with CSV files organized by platform and period.
+    Creates 8 Excel files (one for each period/platform combination), each with 3 sheets: Sales, Payouts, Orders.
+    Returns a zip file containing all 8 Excel files.
     
     Args:
         dd_data_path: Path to DoorDash master file
@@ -518,85 +525,46 @@ def create_date_export_from_master_files(dd_data_path, ue_data_path, pre_start_d
         zip_buffer = io.BytesIO()
         
         with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
-            # Process DoorDash data
+            # Process DoorDash data - create 4 Excel files
             if dd_data_path and Path(dd_data_path).exists():
-                # DD Pre 25
-                dd_pre_25 = filter_master_file_by_date_range(
-                    Path(dd_data_path), pre_start_date, pre_end_date,
-                    ['Timestamp local date', 'Timestamp Local Date', 'Date', 'date'],
-                    excluded_dates
-                )
-                if not dd_pre_25.empty:
-                    _add_date_export_to_zip(zip_file, dd_pre_25, 'DD', 'Pre_25', 'Merchant store ID', 'Subtotal', 'Net total', 'DoorDash order ID')
+                periods = [
+                    ('DD_Pre_25', pre_start_date, pre_end_date, 'Net total'),
+                    ('DD_Post_25', post_start_date, post_end_date, 'Net total'),
+                    ('DD_Pre_24', pre_24_start, pre_24_end, 'Net total (for historical reference only)'),
+                    ('DD_Post_24', post_24_start, post_24_end, 'Net total (for historical reference only)')
+                ]
                 
-                # DD Post 25
-                dd_post_25 = filter_master_file_by_date_range(
-                    Path(dd_data_path), post_start_date, post_end_date,
-                    ['Timestamp local date', 'Timestamp Local Date', 'Date', 'date'],
-                    excluded_dates
-                )
-                if not dd_post_25.empty:
-                    _add_date_export_to_zip(zip_file, dd_post_25, 'DD', 'Post_25', 'Merchant store ID', 'Subtotal', 'Net total', 'DoorDash order ID')
-                
-                # DD Pre 24
-                dd_pre_24 = filter_master_file_by_date_range(
-                    Path(dd_data_path), pre_24_start, pre_24_end,
-                    ['Timestamp local date', 'Timestamp Local Date', 'Date', 'date'],
-                    excluded_dates
-                )
-                if not dd_pre_24.empty:
-                    _add_date_export_to_zip(zip_file, dd_pre_24, 'DD', 'Pre_24', 'Merchant store ID', 'Subtotal', 'Net total (for historical reference only)', 'DoorDash order ID')
-                
-                # DD Post 24
-                dd_post_24 = filter_master_file_by_date_range(
-                    Path(dd_data_path), post_24_start, post_24_end,
-                    ['Timestamp local date', 'Timestamp Local Date', 'Date', 'date'],
-                    excluded_dates
-                )
-                if not dd_post_24.empty:
-                    _add_date_export_to_zip(zip_file, dd_post_24, 'DD', 'Post_24', 'Merchant store ID', 'Subtotal', 'Net total (for historical reference only)', 'DoorDash order ID')
+                for period_name, start_date, end_date, payout_col_name in periods:
+                    df = filter_master_file_by_date_range(
+                        Path(dd_data_path), start_date, end_date,
+                        ['Timestamp local date', 'Timestamp Local Date', 'Date', 'date'],
+                        excluded_dates
+                    )
+                    if not df.empty:
+                        excel_bytes = _create_period_excel_file(df, 'DD', period_name, 'Merchant store ID', 'Subtotal', payout_col_name, 'DoorDash order ID')
+                        if excel_bytes:
+                            zip_file.writestr(f"{period_name}.xlsx", excel_bytes)
             
-            # Process UberEats data
+            # Process UberEats data - create 4 Excel files
             if ue_data_path and Path(ue_data_path).exists():
-                # UE Pre 25
-                ue_pre_25 = filter_master_file_by_date_range(
-                    Path(ue_data_path), pre_start_date, pre_end_date,
-                    ['Order Date', 'Order date', 'order date', 'order Date', 'Date', 'date'],
-                    excluded_dates
-                )
-                if not ue_pre_25.empty:
-                    ue_pre_25, store_col = normalize_store_id_column(ue_pre_25)
-                    _add_date_export_to_zip(zip_file, ue_pre_25, 'UE', 'Pre_25', store_col, 'Sales (excl. tax)', 'Total payout', 'Order ID')
+                periods = [
+                    ('UE_Pre_25', pre_start_date, pre_end_date),
+                    ('UE_Post_25', post_start_date, post_end_date),
+                    ('UE_Pre_24', pre_24_start, pre_24_end),
+                    ('UE_Post_24', post_24_start, post_24_end)
+                ]
                 
-                # UE Post 25
-                ue_post_25 = filter_master_file_by_date_range(
-                    Path(ue_data_path), post_start_date, post_end_date,
-                    ['Order Date', 'Order date', 'order date', 'order Date', 'Date', 'date'],
-                    excluded_dates
-                )
-                if not ue_post_25.empty:
-                    ue_post_25, store_col = normalize_store_id_column(ue_post_25)
-                    _add_date_export_to_zip(zip_file, ue_post_25, 'UE', 'Post_25', store_col, 'Sales (excl. tax)', 'Total payout', 'Order ID')
-                
-                # UE Pre 24
-                ue_pre_24 = filter_master_file_by_date_range(
-                    Path(ue_data_path), pre_24_start, pre_24_end,
-                    ['Order Date', 'Order date', 'order date', 'order Date', 'Date', 'date'],
-                    excluded_dates
-                )
-                if not ue_pre_24.empty:
-                    ue_pre_24, store_col = normalize_store_id_column(ue_pre_24)
-                    _add_date_export_to_zip(zip_file, ue_pre_24, 'UE', 'Pre_24', store_col, 'Sales (excl. tax)', 'Total payout', 'Order ID')
-                
-                # UE Post 24
-                ue_post_24 = filter_master_file_by_date_range(
-                    Path(ue_data_path), post_24_start, post_24_end,
-                    ['Order Date', 'Order date', 'order date', 'order Date', 'Date', 'date'],
-                    excluded_dates
-                )
-                if not ue_post_24.empty:
-                    ue_post_24, store_col = normalize_store_id_column(ue_post_24)
-                    _add_date_export_to_zip(zip_file, ue_post_24, 'UE', 'Post_24', store_col, 'Sales (excl. tax)', 'Total payout', 'Order ID')
+                for period_name, start_date, end_date in periods:
+                    df = filter_master_file_by_date_range(
+                        Path(ue_data_path), start_date, end_date,
+                        ['Order Date', 'Order date', 'order date', 'order Date', 'Date', 'date'],
+                        excluded_dates
+                    )
+                    if not df.empty:
+                        df, store_col = normalize_store_id_column(df)
+                        excel_bytes = _create_period_excel_file(df, 'UE', period_name, store_col, 'Sales (excl. tax)', 'Total payout', 'Order ID')
+                        if excel_bytes:
+                            zip_file.writestr(f"{period_name}.xlsx", excel_bytes)
         
         zip_buffer.seek(0)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -612,19 +580,21 @@ def create_date_export_from_master_files(dd_data_path, ue_data_path, pre_start_d
         return None, None
 
 
-def _add_date_export_to_zip(zip_file, df, platform, period, store_col, sales_col, payout_col, order_col):
+def _create_period_excel_file(df, platform, period_name, store_col, sales_col, payout_col, order_col):
     """
-    Helper function to create date-wise pivot tables and add them to zip file.
+    Create a single Excel file for a specific period with 3 sheets: Sales, Payouts, Orders.
     
     Args:
-        zip_file: ZipFile object
         df: DataFrame with data
         platform: 'DD' or 'UE'
-        period: 'Pre_25', 'Post_25', 'Pre_24', 'Post_24'
+        period_name: Period name like 'DD_Pre_25', 'UE_Post_24', etc.
         store_col: Name of store ID column
         sales_col: Name of sales column
         payout_col: Name of payout column
         order_col: Name of order ID column
+    
+    Returns:
+        Bytes of Excel file
     """
     try:
         # Find date column
@@ -641,14 +611,14 @@ def _add_date_export_to_zip(zip_file, df, platform, period, store_col, sales_col
                     break
         
         if date_col is None or store_col is None or store_col not in df.columns:
-            return
+            return None
         
         # Convert date column
         df[date_col] = pd.to_datetime(df[date_col], errors='coerce')
         df = df.dropna(subset=[date_col, store_col])
         
         if df.empty:
-            return
+            return None
         
         # Convert to numeric
         if sales_col in df.columns:
@@ -661,24 +631,64 @@ def _add_date_export_to_zip(zip_file, df, platform, period, store_col, sales_col
         payouts_agg = df.groupby([date_col, store_col])[payout_col].sum().reset_index() if payout_col in df.columns else pd.DataFrame()
         orders_agg = df.groupby([date_col, store_col])[order_col].nunique().reset_index() if order_col in df.columns else pd.DataFrame()
         
-        # Pivot: Date as index, Store ID as columns
+        # Create Excel workbook with 3 sheets
+        wb = Workbook()
+        wb.remove(wb.active)  # Remove default sheet
+        
+        from openpyxl.utils.dataframe import dataframe_to_rows
+        
+        # Sheet 1: Sales
         if not sales_agg.empty:
             sales_pivot = sales_agg.pivot_table(index=date_col, columns=store_col, values=sales_col, aggfunc='sum', fill_value=0)
             sales_pivot.index = sales_pivot.index.strftime('%Y-%m-%d')
-            sales_csv = sales_pivot.to_csv()
-            zip_file.writestr(f"{platform}_{period}_Sales.csv", sales_csv)
+            sales_pivot.index.name = 'Date'
+            sales_pivot = sales_pivot.reset_index()
+            
+            ws_sales = wb.create_sheet("Sales")
+            for r in dataframe_to_rows(sales_pivot, index=False, header=True):
+                ws_sales.append(r)
+            # Format header row
+            for cell in ws_sales[1]:
+                cell.font = Font(bold=True)
+                cell.alignment = Alignment(horizontal='center', vertical='center')
         
+        # Sheet 2: Payouts
         if not payouts_agg.empty:
             payouts_pivot = payouts_agg.pivot_table(index=date_col, columns=store_col, values=payout_col, aggfunc='sum', fill_value=0)
             payouts_pivot.index = payouts_pivot.index.strftime('%Y-%m-%d')
-            payouts_csv = payouts_pivot.to_csv()
-            zip_file.writestr(f"{platform}_{period}_Payouts.csv", payouts_csv)
+            payouts_pivot.index.name = 'Date'
+            payouts_pivot = payouts_pivot.reset_index()
+            
+            ws_payouts = wb.create_sheet("Payouts")
+            for r in dataframe_to_rows(payouts_pivot, index=False, header=True):
+                ws_payouts.append(r)
+            # Format header row
+            for cell in ws_payouts[1]:
+                cell.font = Font(bold=True)
+                cell.alignment = Alignment(horizontal='center', vertical='center')
         
+        # Sheet 3: Orders
         if not orders_agg.empty:
             orders_pivot = orders_agg.pivot_table(index=date_col, columns=store_col, values=order_col, aggfunc='sum', fill_value=0)
             orders_pivot.index = orders_pivot.index.strftime('%Y-%m-%d')
-            orders_csv = orders_pivot.to_csv()
-            zip_file.writestr(f"{platform}_{period}_Orders.csv", orders_csv)
+            orders_pivot.index.name = 'Date'
+            orders_pivot = orders_pivot.reset_index()
+            
+            ws_orders = wb.create_sheet("Orders")
+            for r in dataframe_to_rows(orders_pivot, index=False, header=True):
+                ws_orders.append(r)
+            # Format header row
+            for cell in ws_orders[1]:
+                cell.font = Font(bold=True)
+                cell.alignment = Alignment(horizontal='center', vertical='center')
+        
+        # Save to BytesIO
+        excel_buffer = io.BytesIO()
+        wb.save(excel_buffer)
+        excel_buffer.seek(0)
+        
+        return excel_buffer.read()
     
     except Exception as e:
-        st.warning(f"Error processing {platform} {period}: {str(e)}")
+        st.warning(f"Error creating Excel file for {period_name}: {str(e)}")
+        return None
