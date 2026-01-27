@@ -562,11 +562,11 @@ def create_date_export_from_master_files(dd_data_path, ue_data_path, pre_start_d
                 ]
                 
                 for period_name, start_date, end_date in periods:
-                df = filter_master_file_by_date_range(
-                    Path(ue_data_path), start_date, end_date,
-                    UE_DATE_COLUMN_VARIATIONS,
-                    excluded_dates
-                )
+                    df = filter_master_file_by_date_range(
+                        Path(ue_data_path), start_date, end_date,
+                        UE_DATE_COLUMN_VARIATIONS,
+                        excluded_dates
+                    )
                     if not df.empty:
                         df, store_col = normalize_store_id_column(df)
                         excel_bytes = _create_period_excel_file(df, 'UE', period_name, store_col, 'Sales (excl. tax)', 'Total payout', 'Order ID')
