@@ -35,15 +35,11 @@ def extract_file_info(file_path, file_type):
         df.columns = df.columns.str.strip()
         num_rows = len(df)
         
-        # Determine date column based on file type - be more flexible
+        # Determine date column based on file type - use canonical columns
         date_col = None
         if file_type == 'dd':
-            # Try multiple possible column names for DD
-            possible_cols = ['Timestamp local date', 'Timestamp Local Date', 'Date', 'date', 'timestamp']
-            for col in df.columns:
-                if any(possible in col for possible in possible_cols):
-                    date_col = col
-                    break
+            from utils import find_date_column, DD_DATE_COLUMN_VARIATIONS
+            date_col = find_date_column(df, DD_DATE_COLUMN_VARIATIONS)
         elif file_type == 'ue':
             # Try multiple possible column names for UE (case-insensitive matching)
             from utils import find_date_column, UE_DATE_COLUMN_VARIATIONS
@@ -183,9 +179,9 @@ def display_file_upload_screen():
     st.markdown('<div class="section-header">Step 1: Configure Date Ranges</div>', unsafe_allow_html=True)
     
     with st.container():
-        st.info("💡 **Enter your Pre and Post date ranges first.** This will help determine which data files you need to download.")
+        st.info("💡 **Enter your Pre and Post date ranges first.** Optionally enter an operator name for export filenames.")
         
-        col1, col2 = st.columns(2)
+        col1, col2, col3 = st.columns([2, 2, 1])
         
         with col1:
             pre_range = st.text_input(
@@ -204,6 +200,19 @@ def display_file_upload_screen():
                 help="Format: MM/DD/YYYY-MM/DD/YYYY (e.g., 12/1/2025-12/31/2025)",
                 placeholder="12/1/2025-12/31/2025"
             )
+        
+        with col3:
+            operator_name = st.text_input(
+                "**Operator**",
+                value=st.session_state.get("operator_name", ""),
+                key="operator_name_upload",
+                help="Used in export filenames (e.g. alpha_analysis_export_...). Leave blank for default.",
+                placeholder="e.g. alpha"
+            )
+            if operator_name and operator_name.strip():
+                st.session_state["operator_name"] = operator_name.strip()
+            else:
+                st.session_state["operator_name"] = ""
     
     # Calculate and display date ranges
     pre_start_date = None
@@ -309,102 +318,90 @@ def display_file_upload_screen():
     
     st.markdown("---")
     
-    # ========== FILE UPLOAD SECTION ==========
+    # ========== FILE UPLOAD SECTION (1 row, 4 boxes) ==========
     st.markdown('<div class="section-header">Step 2: Upload Data Files</div>', unsafe_allow_html=True)
     
     st.info("📋 **After downloading the data files, upload them below:**")
     
-    # File upload cards
-    col1, col2 = st.columns(2)
+    # 1 row, 4 boxes: DD | UE | MKT 1 | MKT 2
+    col_dd, col_ue, col_mkt1, col_mkt2 = st.columns(4)
     
-    with col1:
-        st.markdown("### 🚪 DoorDash Data")
+    with col_dd:
+        st.markdown("### 🚪 DoorDash")
         dd_file = st.file_uploader(
             "Upload dd-data.csv",
             type=['csv'],
             key="dd_upload",
-            help="Upload the DoorDash master data file",
+            help="DoorDash master data (use Timestamp local date)",
             label_visibility="collapsed"
         )
-        
         if dd_file is not None:
-            # Save to temporary file
             if st.session_state.temp_upload_dir is None:
                 st.session_state.temp_upload_dir = Path(tempfile.mkdtemp())
-            
             dd_path = st.session_state.temp_upload_dir / "dd-data.csv"
             with open(dd_path, 'wb') as f:
                 f.write(dd_file.getbuffer())
             st.session_state.uploaded_dd_data = dd_path
-            
-            # Extract and display file info
             info = extract_file_info(dd_path, 'dd')
-            
-            st.markdown(f"""
-            <div class="success-box">
-                ✅ File uploaded: {dd_file.name}
-            </div>
-            """, unsafe_allow_html=True)
-            
-            st.markdown(f"""
-            <div class="file-info-card">
-                <strong>📊 File Information</strong><br>
-                <strong>Rows:</strong> {info['num_rows']:,}<br>
-                {f"<strong>Date Range:</strong> {info['start_date']} to {info['end_date']}" if info['start_date'] and info['end_date'] else "<em>Date range not available</em>"}
-            </div>
-            """, unsafe_allow_html=True)
+            st.markdown(f"""<div class="success-box">✅ {dd_file.name}</div>""", unsafe_allow_html=True)
+            st.caption(f"Rows: {info['num_rows']:,}")
+            if info['start_date'] and info['end_date']:
+                st.caption(f"Date range (Timestamp local date): {info['start_date']} to {info['end_date']}")
+            else:
+                st.caption("Date range not available")
     
-    with col2:
-        st.markdown("### 🚗 UberEats Data")
+    with col_ue:
+        st.markdown("### 🚗 UberEats")
         ue_file = st.file_uploader(
             "Upload ue-data.csv",
             type=['csv'],
             key="ue_upload",
-            help="Upload the UberEats master data file",
+            help="UberEats master data",
             label_visibility="collapsed"
         )
-        
         if ue_file is not None:
-            # Save to temporary file
             if st.session_state.temp_upload_dir is None:
                 st.session_state.temp_upload_dir = Path(tempfile.mkdtemp())
-            
             ue_path = st.session_state.temp_upload_dir / "ue-data.csv"
             with open(ue_path, 'wb') as f:
                 f.write(ue_file.getbuffer())
             st.session_state.uploaded_ue_data = ue_path
-            
-            # Extract and display file info
             info = extract_file_info(ue_path, 'ue')
-            
-            st.markdown(f"""
-            <div class="success-box">
-                ✅ File uploaded: {ue_file.name}
-            </div>
-            """, unsafe_allow_html=True)
-            
-            st.markdown(f"""
-            <div class="file-info-card">
-                <strong>📊 File Information</strong><br>
-                <strong>Rows:</strong> {info['num_rows']:,}<br>
-                {f"<strong>Date Range:</strong> {info['start_date']} to {info['end_date']}" if info['start_date'] and info['end_date'] else "<em>Date range not available</em>"}
-            </div>
-            """, unsafe_allow_html=True)
+            st.markdown(f"""<div class="success-box">✅ {ue_file.name}</div>""", unsafe_allow_html=True)
+            st.caption(f"Rows: {info['num_rows']:,}")
+            if info['start_date'] and info['end_date']:
+                st.caption(f"Date range: {info['start_date']} to {info['end_date']}")
+            else:
+                st.caption("Date range not available")
+    
+    with col_mkt1:
+        st.markdown("### 📈 Marketing (1)")
+        marketing_files = st.file_uploader(
+            "Marketing CSVs",
+            type=['csv'],
+            accept_multiple_files=True,
+            key="marketing_upload",
+            help="Promotion / marketing CSVs",
+            label_visibility="collapsed"
+        )
+    
+    with col_mkt2:
+        st.markdown("### 📈 Marketing (2)")
+        marketing_files_2 = st.file_uploader(
+            "More marketing CSVs",
+            type=['csv'],
+            accept_multiple_files=True,
+            key="marketing_upload_2",
+            help="Additional marketing CSVs (optional)",
+            label_visibility="collapsed"
+        )
+    
+    # Merge both marketing uploads into one folder structure
+    marketing_files = list(marketing_files) if marketing_files else []
+    if marketing_files_2:
+        marketing_files = marketing_files + list(marketing_files_2)
     
     st.markdown("---")
-    
-    # Marketing folder upload
-    st.markdown("### 📈 Marketing Data")
-    st.info("Upload all CSV files from your marketing folder. Select multiple files at once (Ctrl/Cmd + Click)")
-    
-    marketing_files = st.file_uploader(
-        "Upload Marketing CSV Files",
-        type=['csv'],
-        accept_multiple_files=True,
-        key="marketing_upload",
-        help="Select all CSV files from your marketing folder",
-        label_visibility="collapsed"
-    )
     
     if marketing_files and len(marketing_files) > 0:
         # Create marketing folder structure
@@ -570,6 +567,6 @@ def display_file_upload_screen():
                 valid = False
         
         if valid and all_files_uploaded and dates_provided:
-            # Switch to dashboard screen
+            st.session_state["operator_name"] = operator_name.strip() if (operator_name and str(operator_name).strip()) else ""
             st.session_state["current_screen"] = "dashboard"
             st.rerun()

@@ -346,18 +346,31 @@ def main():
         if "selected_stores_UberEats" not in st.session_state or len(st.session_state.get("selected_stores_UberEats", [])) == 0:
             st.session_state["selected_stores_UberEats"] = all_ue_stores.copy()
     
-    # Sidebar for store selection and date exclusion
+    # YoY: identify stores with empty post last year (post_24) to remove from YoY analysis
+    dd_post24 = dd_sales_df[['Store ID', 'post_24']].copy() if not dd_sales_df.empty and 'post_24' in dd_sales_df.columns else pd.DataFrame()
+    ue_post24 = ue_sales_df[['Store ID', 'post_24']].copy() if not ue_sales_df.empty and 'post_24' in ue_sales_df.columns else pd.DataFrame()
+    if not dd_post24.empty:
+        dd_post24['post_24'] = pd.to_numeric(dd_post24['post_24'], errors='coerce').fillna(0)
+    if not ue_post24.empty:
+        ue_post24['post_24'] = pd.to_numeric(ue_post24['post_24'], errors='coerce').fillna(0)
+    yoy_removed_dd = set(dd_post24[dd_post24['post_24'] == 0]['Store ID'].astype(str).tolist()) if not dd_post24.empty else set()
+    yoy_removed_ue = set(ue_post24[ue_post24['post_24'] == 0]['Store ID'].astype(str).tolist()) if not ue_post24.empty else set()
+    yoy_removed_combined = yoy_removed_dd | yoy_removed_ue
+    
+    # Sidebar for store selection, date ranges, and date exclusion
     with st.sidebar:
         # Date Range Selection for Master Files
         st.header("📆 Date Range Selection")
         with st.expander("📅 Pre/Post Date Ranges (Required)", expanded=True):
-            st.info("**⚠️ Date ranges are required!** Enter Pre and Post date ranges in format: MM/DD/YYYY-MM/DD/YYYY (e.g., 11/1/2025-11/30/2025)")
+            st.info("**⚠️ Date ranges are required!** Enter Pre and Post date ranges in format: MM/DD/YYYY-MM/DD/YYYY")
             
-            # Initialize session state for date ranges
+            # Initialize session state for date ranges and operator name
             if "pre_date_range" not in st.session_state:
                 st.session_state["pre_date_range"] = ""
             if "post_date_range" not in st.session_state:
                 st.session_state["post_date_range"] = ""
+            if "operator_name" not in st.session_state:
+                st.session_state["operator_name"] = ""
             
             # Pre period date range
             st.subheader("Pre Period")
@@ -378,6 +391,19 @@ def main():
                 help="Enter date range as: start-end, e.g., 12/1/2025-12/31/2025",
                 placeholder="12/1/2025-12/31/2025"
             )
+            
+            # Operator name (for export filenames)
+            operator_name_sidebar = st.text_input(
+                "Operator name (for exports):",
+                value=st.session_state.get("operator_name", ""),
+                key="operator_name_sidebar",
+                help="e.g. alpha → alpha_analysis_export_.... Leave blank for default.",
+                placeholder="e.g. alpha"
+            )
+            if operator_name_sidebar is not None and str(operator_name_sidebar).strip():
+                st.session_state["operator_name"] = str(operator_name_sidebar).strip()
+            else:
+                st.session_state["operator_name"] = ""
             
             # Validate and apply button
             col1, col2 = st.columns(2)
@@ -496,110 +522,60 @@ def main():
         # UberEats store selection
         create_store_selector("UberEats", ue_sales_df, "selected_stores_UberEats", 
                              file_uploaded=ue_file_uploaded, date_ranges_set=date_ranges_set)
-    
-    st.divider()
-    
-    # Date Exclusion Section
-    st.header("📅 Date Exclusion")
-    with st.expander("🚫 Exclude Dates from Analysis", expanded=False):
-            # Initialize session state for excluded dates
+        
+        st.divider()
+        
+        # Date Exclusion (in side panel)
+        st.header("📅 Date Exclusion")
+        with st.expander("🚫 Exclude Dates from Analysis", expanded=False):
             if "excluded_dates" not in st.session_state:
                 st.session_state["excluded_dates"] = []
-            
-            # Text input for manual date entry (MM/DD/YYYY format) - primary method
             st.subheader("Enter Dates to Exclude")
             date_input_text = st.text_input(
-                "Enter dates in MM/DD/YYYY format (comma-separated):",
+                "Dates (MM/DD/YYYY, comma-separated):",
                 key="date_text_input",
-                help="Example: 11/30/2024, 12/01/2024, 12/25/2024",
+                help="Example: 11/30/2024, 12/01/2024",
                 placeholder="11/30/2024, 12/01/2024"
             )
-            
-            # Date picker for adding individual dates
-            st.subheader("Or Add Date via Date Picker")
-            new_date = st.date_input(
-                "Select a date to add:",
-                key="date_picker_exclude",
-                help="Select a date and click 'Add Date' to add it to the exclusion list."
-            )
-            
-            # Parse text input dates
+            new_date = st.date_input("Or add via date picker:", key="date_picker_exclude")
             text_dates = []
             if date_input_text:
-                date_strings = [d.strip() for d in date_input_text.split(',')]
-                for date_str in date_strings:
-                    if date_str:  # Skip empty strings
-                        try:
-                            # Parse MM/DD/YYYY format
-                            parsed_date = pd.to_datetime(date_str, format='%m/%d/%Y')
-                            text_dates.append(parsed_date.date())
-                        except:
-                            st.warning(f"Invalid date format: {date_str}. Please use MM/DD/YYYY format.")
-            
-            # Get current excluded dates from session state
+                for date_str in [d.strip() for d in date_input_text.split(',') if d.strip()]:
+                    try:
+                        text_dates.append(pd.to_datetime(date_str, format='%m/%d/%Y').date())
+                    except Exception:
+                        st.warning(f"Invalid date: {date_str}. Use MM/DD/YYYY.")
             current_excluded = st.session_state["excluded_dates"].copy() if st.session_state["excluded_dates"] else []
-            
-            # Combine current excluded dates with text input dates
             all_excluded_dates = list(set(current_excluded + text_dates))
-            
-            # Display current excluded dates
             if all_excluded_dates:
-                st.info(f"**{len(all_excluded_dates)}** date(s) will be excluded:")
-                for date in sorted(all_excluded_dates):
-                    st.text(f"  • {date.strftime('%m/%d/%Y')}")
+                st.info(f"**{len(all_excluded_dates)}** date(s) excluded")
+                for d in sorted(all_excluded_dates):
+                    st.caption(f"  • {d.strftime('%m/%d/%Y')}")
             else:
                 st.info("No dates excluded")
-            
-            # Buttons for managing dates
-            col1, col2, col3 = st.columns(3)
-            with col1:
+            c1, c2, c3 = st.columns(3)
+            with c1:
                 if st.button("Add Date", key="add_date_picker"):
                     if new_date not in all_excluded_dates:
                         all_excluded_dates.append(new_date)
                         st.session_state["excluded_dates"] = all_excluded_dates
                         st.rerun()
                     else:
-                        st.warning("Date already in exclusion list")
-            with col2:
+                        st.warning("Date already in list")
+            with c2:
                 if st.button("Apply Exclusion", type="primary", key="apply_date_exclusion"):
                     st.session_state["excluded_dates"] = all_excluded_dates
                     st.rerun()
-            with col3:
+            with c3:
                 if st.button("Clear All", key="clear_date_exclusion"):
                     st.session_state["excluded_dates"] = []
                     st.rerun()
-        
+    
     # Store selection is already initialized above (after data loading, before sidebar)
     
-    # Store selection summary at the top
-    st.subheader("📊 Store Selection Summary")
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        dd_total = len(dd_sales_df['Store ID'].unique()) if not dd_sales_df.empty else 0
-        dd_selected = len(st.session_state.get("selected_stores_DoorDash", []))
-        st.metric("DoorDash Stores", f"{dd_selected} / {dd_total}")
-    
-    with col2:
-        ue_total = len(ue_sales_df['Store ID'].unique()) if not ue_sales_df.empty else 0
-        ue_selected = len(st.session_state.get("selected_stores_UberEats", []))
-        st.metric("UberEats Stores", f"{ue_selected} / {ue_total}")
-    
-    st.divider()
-    
-    # Export buttons at the top
-    st.subheader("📥 Export Data")
-    col1, col2 = st.columns(2)
-    with col1:
-        export_clicked = st.button("📊 Export All Tables to Excel", type="primary", width='stretch', key="export_excel")
-    with col2:
-        date_export_clicked = st.button("📅 Date Export", type="primary", width='stretch', key="export_date")
-    
-    st.divider()
-    
-    # Get all table data first (needed for exports)
-    dd_table1, dd_table2 = get_platform_store_tables(dd_sales_df, "selected_stores_DoorDash") if not dd_sales_df.empty else (None, None)
-    ue_table1, ue_table2 = get_platform_store_tables(ue_sales_df, "selected_stores_UberEats") if not ue_sales_df.empty else (None, None)
+    # Get all table data first (needed for exports and top summary); YoY tables exclude stores with empty post last year
+    dd_table1, dd_table2 = get_platform_store_tables(dd_sales_df, "selected_stores_DoorDash", yoy_exclude_stores=yoy_removed_dd) if not dd_sales_df.empty else (None, None)
+    ue_table1, ue_table2 = get_platform_store_tables(ue_sales_df, "selected_stores_UberEats", yoy_exclude_stores=yoy_removed_ue) if not ue_sales_df.empty else (None, None)
     dd_summary1, dd_summary2 = get_platform_summary_tables(dd_sales_df, dd_payouts_df, dd_orders_df, dd_new_customers_df, "selected_stores_DoorDash", is_ue=False) if not dd_sales_df.empty else (None, None)
     ue_summary1, ue_summary2 = get_platform_summary_tables(ue_sales_df, ue_payouts_df, ue_orders_df, ue_new_customers_df, "selected_stores_UberEats", is_ue=True) if not ue_sales_df.empty else (None, None)
     combined_summary1, combined_summary2 = create_combined_summary_tables(
@@ -609,6 +585,58 @@ def main():
         st.session_state.get("selected_stores_UberEats", [])
     )
     combined_store_table1, combined_store_table2 = create_combined_store_tables(dd_table1, dd_table2, ue_table1, ue_table2)
+    if combined_store_table2 is not None and not combined_store_table2.empty and yoy_removed_combined:
+        combined_store_table2 = combined_store_table2.reset_index()
+        if 'Store ID' in combined_store_table2.columns:
+            combined_store_table2 = combined_store_table2[~combined_store_table2['Store ID'].astype(str).isin(yoy_removed_combined)]
+        if not combined_store_table2.empty and 'Store ID' in combined_store_table2.columns:
+            combined_store_table2 = combined_store_table2.set_index('Store ID')
+    
+    # Top summary table (at top of dashboard)
+    linear_growth = combined_summary1.loc['Sales', 'Growth%'] if combined_summary1 is not None and not combined_summary1.empty and 'Sales' in combined_summary1.index and 'Growth%' in combined_summary1.columns else 0
+    yoy_growth = combined_summary2.loc['Sales', 'YoY%'] if combined_summary2 is not None and not combined_summary2.empty and 'Sales' in combined_summary2.index and 'YoY%' in combined_summary2.columns else 0
+    dgc = combined_summary1.loc['Orders', 'Growth%'] if combined_summary1 is not None and not combined_summary1.empty and 'Orders' in combined_summary1.index and 'Growth%' in combined_summary1.columns else 0
+    nc_growth = combined_summary1.loc['New Customers', 'Growth%'] if combined_summary1 is not None and not combined_summary1.empty and 'New Customers' in combined_summary1.index and 'Growth%' in combined_summary1.columns else 0
+    dd_store_count = max(1, len(st.session_state.get("selected_stores_DoorDash", [])))
+    payouts_prevs_post = combined_summary1.loc['Payouts', 'PrevsPost'] if combined_summary1 is not None and not combined_summary1.empty and 'Payouts' in combined_summary1.index and 'PrevsPost' in combined_summary1.columns else 0
+    payouts_per_store = payouts_prevs_post / dd_store_count if dd_store_count else 0
+    st.subheader("📈 Summary Metrics")
+    s1, s2, s3, s4, s5 = st.columns(5)
+    with s1:
+        st.metric("Linear Growth", f"{linear_growth:.1f}%", "Combined pre vs post sales growth%")
+    with s2:
+        st.metric("YoY Growth", f"{yoy_growth:.1f}%", "Combined YoY sales growth%")
+    with s3:
+        st.metric("DGC", f"{dgc:.1f}%", "Combined pre vs post orders growth%")
+    with s4:
+        st.metric("New Customers", f"{nc_growth:.1f}%", "Combined new customers growth%")
+    with s5:
+        st.metric("Payouts Increase per store", f"${payouts_per_store:,.1f}", f"Payout pre vs post / {dd_store_count} DD stores")
+    if yoy_removed_combined:
+        st.info(f"**Store(s):** {', '.join(sorted(yoy_removed_combined))} **removed from YoY** (no post last year in DoorDash or UberEats).")
+    st.divider()
+    
+    # Store selection summary
+    st.subheader("📊 Store Selection Summary")
+    col1, col2 = st.columns(2)
+    with col1:
+        dd_total = len(dd_sales_df['Store ID'].unique()) if not dd_sales_df.empty else 0
+        dd_selected = len(st.session_state.get("selected_stores_DoorDash", []))
+        st.metric("DoorDash Stores", f"{dd_selected} / {dd_total}")
+    with col2:
+        ue_total = len(ue_sales_df['Store ID'].unique()) if not ue_sales_df.empty else 0
+        ue_selected = len(st.session_state.get("selected_stores_UberEats", []))
+        st.metric("UberEats Stores", f"{ue_selected} / {ue_total}")
+    st.divider()
+    
+    # Export buttons
+    st.subheader("📥 Export Data")
+    col1, col2 = st.columns(2)
+    with col1:
+        export_clicked = st.button("📊 Export All Tables to Excel", type="primary", width='stretch', key="export_excel")
+    with col2:
+        date_export_clicked = st.button("📅 Date Export", type="primary", width='stretch', key="export_date")
+    st.divider()
     
     # Get Corporate vs TODC tables
     promotion_table, sponsored_table, corporate_todc_table = create_corporate_vs_todc_table(
@@ -635,7 +663,8 @@ def main():
                         pre_end_date=pre_end,
                         post_start_date=post_start,
                         post_end_date=post_end,
-                        excluded_dates=excluded_dates
+                        excluded_dates=excluded_dates,
+                        operator_name=st.session_state.get("operator_name") or None
                     )
                     if excel_bytes and excel_filename:
                         st.success(f"✅ **Date Export successful!** Downloading zip file with 8 Excel files...")
@@ -668,7 +697,8 @@ def main():
                     combined_summary1, combined_summary2, combined_store_table1, combined_store_table2,
                     corporate_todc_table=corporate_todc_table,
                     promotion_table=promotion_table,
-                    sponsored_table=sponsored_table
+                    sponsored_table=sponsored_table,
+                    operator_name=st.session_state.get("operator_name") or None
                 )
                 st.success(f"✅ **Export successful!** Downloading file...")
                 st.download_button(

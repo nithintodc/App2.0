@@ -10,7 +10,7 @@ from openpyxl.styles import Alignment, Font
 from openpyxl.utils import get_column_letter
 from config import ROOT_DIR
 from gdrive_utils import get_drive_manager
-from utils import normalize_store_id_column, filter_master_file_by_date_range, UE_DATE_COLUMN_VARIATIONS
+from utils import normalize_store_id_column, filter_master_file_by_date_range, UE_DATE_COLUMN_VARIATIONS, DD_DATE_COLUMN_VARIATIONS
 from table_generation import create_summary_tables
 from data_processing import get_last_year_dates
 
@@ -20,7 +20,8 @@ def export_to_excel(dd_table1, dd_table2, ue_table1, ue_table2,
                      ue_sales_df, ue_payouts_df, ue_orders_df, ue_new_customers_df,
                      dd_selected_stores, ue_selected_stores,
                      combined_summary1, combined_summary2, combined_store_table1, combined_store_table2,
-                     corporate_todc_table=None, promotion_table=None, sponsored_table=None):
+                     corporate_todc_table=None, promotion_table=None, sponsored_table=None,
+                     operator_name=None):
     """Export all tables to an Excel file with sheets: Summary Tables, Store-Level Tables, and Corporate vs TODC"""
     # Use temp directory for file creation (will be downloaded, not saved to disk)
     import tempfile
@@ -245,9 +246,10 @@ def export_to_excel(dd_table1, dd_table2, ue_table1, ue_table2,
             sponsored_export = sponsored_export.set_index('Is Self Serve Campaign')
             current_row = add_table_to_sheet(ws_corporate, "Sponsored Listing: Corporate vs TODC", sponsored_export, current_row)
     
-    # Generate filename with timestamp
+    # Generate filename with timestamp (use operator name if provided)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filename = f"analysis_export_{timestamp}.xlsx"
+    tag = (operator_name.strip() if operator_name and isinstance(operator_name, str) and operator_name.strip() else None)
+    filename = f"{tag}_analysis_export_{timestamp}.xlsx" if tag else f"analysis_export_{timestamp}.xlsx"
     filepath = outputs_dir / filename
     
     # Save workbook
@@ -490,7 +492,7 @@ def create_date_export(dd_pre_24_path, dd_post_24_path, dd_pre_25_path, dd_post_
     return result if result else None
 
 
-def create_date_export_from_master_files(dd_data_path, ue_data_path, pre_start_date, pre_end_date, post_start_date, post_end_date, excluded_dates=None):
+def create_date_export_from_master_files(dd_data_path, ue_data_path, pre_start_date, pre_end_date, post_start_date, post_end_date, excluded_dates=None, operator_name=None):
     """
     Create date-wise exports of DD and UE financial data.
     Creates 8 Excel files (one for each period/platform combination), each with 3 sheets: Sales, Payouts, Orders.
@@ -529,7 +531,7 @@ def create_date_export_from_master_files(dd_data_path, ue_data_path, pre_start_d
                 for period_name, start_date, end_date, payout_col_name in periods:
                     df = filter_master_file_by_date_range(
                         Path(dd_data_path), start_date, end_date,
-                        ['Timestamp local date', 'Timestamp Local Date', 'Date', 'date'],
+                        DD_DATE_COLUMN_VARIATIONS,
                         excluded_dates
                     )
                     if not df.empty:
@@ -560,7 +562,8 @@ def create_date_export_from_master_files(dd_data_path, ue_data_path, pre_start_d
         
         zip_buffer.seek(0)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"date_export_{timestamp}.zip"
+        tag = (operator_name.strip() if operator_name and isinstance(operator_name, str) and operator_name.strip() else None)
+        filename = f"{tag}_date_export_{timestamp}.zip" if tag else f"date_export_{timestamp}.zip"
         
         return zip_buffer.read(), filename
     
