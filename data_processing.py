@@ -728,12 +728,17 @@ def process_new_customers_data(pre_24_nc, post_24_nc, pre_25_nc, post_25_nc, is_
     if not post_25_nc_renamed.empty:
         nc_result = nc_result.merge(post_25_nc_renamed, on='Store ID', how='outer')
     
+    # Ensure all required columns exist (create with 0 if missing)
+    required_cols = ['pre_24', 'post_24', 'pre_25', 'post_25']
+    for col in required_cols:
+        if col not in nc_result.columns:
+            nc_result[col] = 0
+    
     nc_result = nc_result.fillna(0)
     
     # Ensure numeric columns are numeric type before calculations
-    for col in ['pre_24', 'post_24', 'pre_25', 'post_25']:
-        if col in nc_result.columns:
-            nc_result[col] = pd.to_numeric(nc_result[col], errors='coerce').fillna(0)
+    for col in required_cols:
+        nc_result[col] = pd.to_numeric(nc_result[col], errors='coerce').fillna(0)
     
     # Calculate metrics - ensure numeric types
     nc_result['PrevsPost'] = pd.to_numeric(nc_result['post_25'], errors='coerce').fillna(0) - pd.to_numeric(nc_result['pre_25'], errors='coerce').fillna(0)

@@ -35,17 +35,19 @@ def extract_file_info(file_path, file_type):
         df.columns = df.columns.str.strip()
         num_rows = len(df)
         
-        # Determine date column based on file type - use canonical columns
+        # Determine date column based on file type
         date_col = None
         if file_type == 'dd':
             from utils import find_date_column, DD_DATE_COLUMN_VARIATIONS
             date_col = find_date_column(df, DD_DATE_COLUMN_VARIATIONS)
         elif file_type == 'ue':
-            # Try multiple possible column names for UE (case-insensitive matching)
-            from utils import find_date_column, UE_DATE_COLUMN_VARIATIONS
-            possible_cols = UE_DATE_COLUMN_VARIATIONS + ['Order Date (Local)']
-            # Use find_date_column for proper case-insensitive matching
-            date_col = find_date_column(df, possible_cols)
+            # For UE files: hardcode to 9th column (index 8)
+            if len(df.columns) > 8:
+                date_col = df.columns[8]
+            else:
+                # Debug: show available columns if we don't have 9 columns
+                st.warning(f"UE file has only {len(df.columns)} columns. Expected at least 9. Available columns: {list(df.columns)}")
+                date_col = None
         elif file_type == 'marketing':
             possible_cols = ['Date', 'date']
             for col in df.columns:
@@ -153,10 +155,20 @@ def display_file_upload_screen():
     .date-range-display {
         background: var(--secondary-background-color);
         border-left: 4px solid var(--primary-color);
-        padding: 1rem;
+        padding: 0.75rem;
         border-radius: 4px;
-        margin: 0.5rem 0;
+        margin: 0.25rem 0;
         color: var(--text-color);
+        font-size: 0.9rem;
+    }
+    .date-range-small {
+        background: var(--secondary-background-color);
+        border-left: 3px solid var(--primary-color);
+        padding: 0.5rem;
+        border-radius: 4px;
+        margin: 0.25rem;
+        color: var(--text-color);
+        font-size: 0.85rem;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -261,53 +273,54 @@ def display_file_upload_screen():
         pre_last_year_days = calculate_days_in_range(pre_start_last_year.date(), pre_end_last_year.date())
         post_last_year_days = calculate_days_in_range(post_start_last_year.date(), post_end_last_year.date())
         
-        # Display date ranges in cards
+        # Display date ranges in 1x4 columns layout
         st.markdown("### 📅 Date Range Summary")
         
-        col1, col2 = st.columns(2)
+        col1, col2, col3, col4 = st.columns(4)
         
         with col1:
             st.markdown(f"""
-            <div class="date-range-display">
+            <div class="date-range-small">
                 <strong>Pre (Current Year)</strong><br>
                 {pre_start_str} - {pre_end_str}<br>
                 <small>{pre_days} days</small>
             </div>
             """, unsafe_allow_html=True)
-            
+        
+        with col2:
             st.markdown(f"""
-            <div class="date-range-display">
+            <div class="date-range-small">
+                <strong>Post (Current Year)</strong><br>
+                {post_start_str} - {post_end_str}<br>
+                <small>{post_days} days</small>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        with col3:
+            st.markdown(f"""
+            <div class="date-range-small">
                 <strong>Pre (Last Year)</strong><br>
                 {pre_start_last_year.strftime('%m/%d/%Y')} - {pre_end_last_year.strftime('%m/%d/%Y')}<br>
                 <small>{pre_last_year_days} days</small>
             </div>
             """, unsafe_allow_html=True)
         
-        with col2:
+        with col4:
             st.markdown(f"""
-            <div class="date-range-display">
-                <strong>Post (Current Year)</strong><br>
-                {post_start_str} - {post_end_str}<br>
-                <small>{post_days} days</small>
-            </div>
-            """, unsafe_allow_html=True)
-            
-            st.markdown(f"""
-            <div class="date-range-display">
+            <div class="date-range-small">
                 <strong>Post (Last Year)</strong><br>
                 {post_start_last_year.strftime('%m/%d/%Y')} - {post_end_last_year.strftime('%m/%d/%Y')}<br>
                 <small>{post_last_year_days} days</small>
             </div>
             """, unsafe_allow_html=True)
         
-        # Suggested download range
+        # Suggested download range - directly below date ranges
         suggested_start = pre_start_last_year.date()
         suggested_end = post_end_date.date()
         suggested_days = calculate_days_in_range(suggested_start, suggested_end)
         
-        st.markdown("---")
         st.markdown(f"""
-        <div class="info-box">
+        <div class="info-box" style="margin-top: 1rem;">
             <h3 style="margin-top:0; color: var(--text-color);">📥 Recommended Data Download Range</h3>
             <p style="font-size:1.2rem; margin-bottom:0.5rem; color: var(--text-color);">
                 <strong style="color: var(--text-color);">{suggested_start.strftime('%m/%d/%Y')} - {suggested_end.strftime('%m/%d/%Y')}</strong>
@@ -323,8 +336,8 @@ def display_file_upload_screen():
     
     st.info("📋 **After downloading the data files, upload them below:**")
     
-    # 1 row, 4 boxes: DD | UE | MKT 1 | MKT 2
-    col_dd, col_ue, col_mkt1, col_mkt2 = st.columns(4)
+    # 1 row, 3 boxes: DD | UE | Marketing
+    col_dd, col_ue, col_mkt = st.columns(3)
     
     with col_dd:
         st.markdown("### 🚪 DoorDash")
@@ -374,32 +387,37 @@ def display_file_upload_screen():
             else:
                 st.caption("Date range not available")
     
-    with col_mkt1:
-        st.markdown("### 📈 Marketing (1)")
+    with col_mkt:
+        st.markdown("### 📈 Marketing")
         marketing_files = st.file_uploader(
-            "Marketing CSVs",
+            "Upload Marketing CSVs",
             type=['csv'],
             accept_multiple_files=True,
             key="marketing_upload",
-            help="Promotion / marketing CSVs",
+            help="Upload all marketing CSV files (Promotion & Sponsored)",
             label_visibility="collapsed"
         )
+        # Show date range for marketing files if uploaded
+        if marketing_files and len(marketing_files) > 0:
+            # Try to extract date range from first file
+            if st.session_state.temp_upload_dir is None:
+                st.session_state.temp_upload_dir = Path(tempfile.mkdtemp())
+            temp_mkt_dir = st.session_state.temp_upload_dir / "temp_mkt"
+            temp_mkt_dir.mkdir(exist_ok=True)
+            first_file_path = temp_mkt_dir / marketing_files[0].name
+            with open(first_file_path, 'wb') as f:
+                f.write(marketing_files[0].getbuffer())
+            info = extract_file_info(first_file_path, 'marketing')
+            if info['start_date'] and info['end_date']:
+                st.caption(f"Date range: {info['start_date']} to {info['end_date']}")
+            # Clean up temp file
+            try:
+                first_file_path.unlink()
+            except:
+                pass
     
-    with col_mkt2:
-        st.markdown("### 📈 Marketing (2)")
-        marketing_files_2 = st.file_uploader(
-            "More marketing CSVs",
-            type=['csv'],
-            accept_multiple_files=True,
-            key="marketing_upload_2",
-            help="Additional marketing CSVs (optional)",
-            label_visibility="collapsed"
-        )
-    
-    # Merge both marketing uploads into one folder structure
+    # Convert to list
     marketing_files = list(marketing_files) if marketing_files else []
-    if marketing_files_2:
-        marketing_files = marketing_files + list(marketing_files_2)
     
     st.markdown("---")
     
@@ -512,7 +530,7 @@ def display_file_upload_screen():
     if not dates_provided:
         st.warning("⚠️ Please enter both Pre and Post date ranges before proceeding.")
     
-    if st.button("🚀 Start Analysis", type="primary", disabled=not (all_files_uploaded and dates_provided), width='stretch'):
+    if st.button("🚀 Start Analysis", type="primary", disabled=not (all_files_uploaded and dates_provided)):
         # Validate and parse dates
         valid = True
         

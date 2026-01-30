@@ -21,7 +21,7 @@ def export_to_excel(dd_table1, dd_table2, ue_table1, ue_table2,
                      dd_selected_stores, ue_selected_stores,
                      combined_summary1, combined_summary2, combined_store_table1, combined_store_table2,
                      corporate_todc_table=None, promotion_table=None, sponsored_table=None,
-                     operator_name=None):
+                     summary_metrics_table=None, operator_name=None):
     """Export all tables to an Excel file with sheets: Summary Tables, Store-Level Tables, and Corporate vs TODC"""
     # Use temp directory for file creation (will be downloaded, not saved to disk)
     import tempfile
@@ -154,6 +154,10 @@ def export_to_excel(dd_table1, dd_table2, ue_table1, ue_table2,
             ws.column_dimensions[get_column_letter(col_idx)].width = min(max_length + 2, 50)
         
         return start_row + 1  # Add blank row after table
+    
+    # Add Summary Metrics table first
+    if summary_metrics_table is not None and not summary_metrics_table.empty:
+        current_row = add_table_to_sheet(ws_summary, "Summary Metrics", summary_metrics_table, current_row)
     
     # Add Combined Table 1
     if combined_summary1 is not None:
@@ -375,13 +379,11 @@ def create_date_export(dd_pre_24_path, dd_post_24_path, dd_pre_25_path, dd_post_
             # Normalize store ID column (check for both 'Store ID' and 'Shop ID')
             df, store_col = normalize_store_id_column(df)
             
-            # Find "Order Date" column for UE (case-insensitive matching)
-            # Try all common variations: "Order Date", "Order date", "order date", "order Date"
-            from utils import find_date_column
-            date_col = find_date_column(df, UE_DATE_COLUMN_VARIATIONS)
-            
-            if date_col is None:
-                st.warning(f"Date column not found in UE file. Tried: {UE_DATE_COLUMN_VARIATIONS}. Available columns: {list(df.columns)[:10]}")
+            # For UE files: hardcode to 9th column (index 8) as Order Date
+            if len(df.columns) > 8:
+                date_col = df.columns[8]
+            else:
+                st.warning(f"UE file {file_path.name} has fewer than 9 columns. Available columns: {list(df.columns)}")
                 return pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
             
             sales_col = 'Sales (excl. tax)'
@@ -592,13 +594,16 @@ def _create_period_excel_file(df, platform, period_name, store_col, sales_col, p
         Bytes of Excel file
     """
     try:
-        # Find date column using proper matching (case-insensitive)
+        # Find date column
         from utils import find_date_column, DD_DATE_COLUMN_VARIATIONS
         date_col = None
         if platform == 'DD':
             date_col = find_date_column(df, DD_DATE_COLUMN_VARIATIONS)
-        else:  # UE
-            date_col = find_date_column(df, UE_DATE_COLUMN_VARIATIONS)
+        else:  # UE - hardcode to 9th column (index 8)
+            if len(df.columns) > 8:
+                date_col = df.columns[8]
+            else:
+                return None
         
         if date_col is None or store_col is None or store_col not in df.columns:
             return None

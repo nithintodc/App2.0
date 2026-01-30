@@ -203,14 +203,14 @@ def main():
         if current_screen == "upload":
             st.markdown("**📤 Upload Files** (Current)")
         else:
-            if st.button("📤 Upload Files", width='stretch', key="nav_upload"):
+            if st.button("📤 Upload Files", key="nav_upload"):
                 st.session_state["current_screen"] = "upload"
                 st.rerun()
         
         if current_screen == "dashboard":
             st.markdown("**📊 Dashboard** (Current)")
         else:
-            if st.button("📊 Dashboard", width='stretch', key="nav_dashboard"):
+            if st.button("📊 Dashboard", key="nav_dashboard"):
                 if st.session_state.get("uploaded_dd_data") and st.session_state.get("uploaded_ue_data"):
                     st.session_state["current_screen"] = "dashboard"
                     st.rerun()
@@ -345,17 +345,6 @@ def main():
         all_ue_stores = sorted(ue_sales_df['Store ID'].unique().tolist())
         if "selected_stores_UberEats" not in st.session_state or len(st.session_state.get("selected_stores_UberEats", [])) == 0:
             st.session_state["selected_stores_UberEats"] = all_ue_stores.copy()
-    
-    # YoY: identify stores with empty post last year (post_24) to remove from YoY analysis
-    dd_post24 = dd_sales_df[['Store ID', 'post_24']].copy() if not dd_sales_df.empty and 'post_24' in dd_sales_df.columns else pd.DataFrame()
-    ue_post24 = ue_sales_df[['Store ID', 'post_24']].copy() if not ue_sales_df.empty and 'post_24' in ue_sales_df.columns else pd.DataFrame()
-    if not dd_post24.empty:
-        dd_post24['post_24'] = pd.to_numeric(dd_post24['post_24'], errors='coerce').fillna(0)
-    if not ue_post24.empty:
-        ue_post24['post_24'] = pd.to_numeric(ue_post24['post_24'], errors='coerce').fillna(0)
-    yoy_removed_dd = set(dd_post24[dd_post24['post_24'] == 0]['Store ID'].astype(str).tolist()) if not dd_post24.empty else set()
-    yoy_removed_ue = set(ue_post24[ue_post24['post_24'] == 0]['Store ID'].astype(str).tolist()) if not ue_post24.empty else set()
-    yoy_removed_combined = yoy_removed_dd | yoy_removed_ue
     
     # Sidebar for store selection, date ranges, and date exclusion
     with st.sidebar:
@@ -573,9 +562,9 @@ def main():
     
     # Store selection is already initialized above (after data loading, before sidebar)
     
-    # Get all table data first (needed for exports and top summary); YoY tables exclude stores with empty post last year
-    dd_table1, dd_table2 = get_platform_store_tables(dd_sales_df, "selected_stores_DoorDash", yoy_exclude_stores=yoy_removed_dd) if not dd_sales_df.empty else (None, None)
-    ue_table1, ue_table2 = get_platform_store_tables(ue_sales_df, "selected_stores_UberEats", yoy_exclude_stores=yoy_removed_ue) if not ue_sales_df.empty else (None, None)
+    # Get all table data first (needed for exports and top summary)
+    dd_table1, dd_table2 = get_platform_store_tables(dd_sales_df, "selected_stores_DoorDash") if not dd_sales_df.empty else (None, None)
+    ue_table1, ue_table2 = get_platform_store_tables(ue_sales_df, "selected_stores_UberEats") if not ue_sales_df.empty else (None, None)
     dd_summary1, dd_summary2 = get_platform_summary_tables(dd_sales_df, dd_payouts_df, dd_orders_df, dd_new_customers_df, "selected_stores_DoorDash", is_ue=False) if not dd_sales_df.empty else (None, None)
     ue_summary1, ue_summary2 = get_platform_summary_tables(ue_sales_df, ue_payouts_df, ue_orders_df, ue_new_customers_df, "selected_stores_UberEats", is_ue=True) if not ue_sales_df.empty else (None, None)
     combined_summary1, combined_summary2 = create_combined_summary_tables(
@@ -585,12 +574,6 @@ def main():
         st.session_state.get("selected_stores_UberEats", [])
     )
     combined_store_table1, combined_store_table2 = create_combined_store_tables(dd_table1, dd_table2, ue_table1, ue_table2)
-    if combined_store_table2 is not None and not combined_store_table2.empty and yoy_removed_combined:
-        combined_store_table2 = combined_store_table2.reset_index()
-        if 'Store ID' in combined_store_table2.columns:
-            combined_store_table2 = combined_store_table2[~combined_store_table2['Store ID'].astype(str).isin(yoy_removed_combined)]
-        if not combined_store_table2.empty and 'Store ID' in combined_store_table2.columns:
-            combined_store_table2 = combined_store_table2.set_index('Store ID')
     
     # Top summary table (at top of dashboard)
     linear_growth = combined_summary1.loc['Sales', 'Growth%'] if combined_summary1 is not None and not combined_summary1.empty and 'Sales' in combined_summary1.index and 'Growth%' in combined_summary1.columns else 0
@@ -612,8 +595,21 @@ def main():
         st.metric("New Customers", f"{nc_growth:.1f}%", "Combined new customers growth%")
     with s5:
         st.metric("Payouts Increase per store", f"${payouts_per_store:,.1f}", f"Payout pre vs post / {dd_store_count} DD stores")
-    if yoy_removed_combined:
-        st.info(f"**Store(s):** {', '.join(sorted(yoy_removed_combined))} **removed from YoY** (no post last year in DoorDash or UberEats).")
+    
+    # Summary Metrics Table
+    summary_metrics_data = {
+        'Metric': ['Linear Growth', 'YoY Growth', 'DGC', 'New Customers', 'Payouts Increase per store'],
+        'Value': [
+            f"{linear_growth:.1f}%",
+            f"{yoy_growth:.1f}%",
+            f"{dgc:.1f}%",
+            f"{nc_growth:.1f}%",
+            f"${payouts_per_store:,.1f}"
+        ]
+    }
+    summary_metrics_df = pd.DataFrame(summary_metrics_data)
+    st.dataframe(summary_metrics_df, use_container_width=True, hide_index=True)
+    
     st.divider()
     
     # Store selection summary
@@ -633,9 +629,9 @@ def main():
     st.subheader("📥 Export Data")
     col1, col2 = st.columns(2)
     with col1:
-        export_clicked = st.button("📊 Export All Tables to Excel", type="primary", width='stretch', key="export_excel")
+        export_clicked = st.button("📊 Export All Tables to Excel", type="primary", key="export_excel")
     with col2:
-        date_export_clicked = st.button("📅 Date Export", type="primary", width='stretch', key="export_date")
+        date_export_clicked = st.button("📅 Date Export", type="primary", key="export_date")
     st.divider()
     
     # Get Corporate vs TODC tables
@@ -673,8 +669,7 @@ def main():
                             data=excel_bytes,
                             file_name=excel_filename,
                             mime="application/zip",
-                            type="primary",
-                            width='stretch'
+                            type="primary"
                         )
                     else:
                         st.error("❌ **Date Export failed!** Please check your data files and date ranges.")
@@ -698,6 +693,7 @@ def main():
                     corporate_todc_table=corporate_todc_table,
                     promotion_table=promotion_table,
                     sponsored_table=sponsored_table,
+                    summary_metrics_table=summary_metrics_df,
                     operator_name=st.session_state.get("operator_name") or None
                 )
                 st.success(f"✅ **Export successful!** Downloading file...")
@@ -706,8 +702,7 @@ def main():
                     data=file_bytes,
                     file_name=filename,
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    type="primary",
-                    width='stretch'
+                    type="primary"
                 )
         except Exception as e:
             st.error(f"❌ **Export failed!** Error: {str(e)}")

@@ -129,37 +129,54 @@ def filter_master_file_by_date_range(file_path, start_date, end_date, date_col_n
         Filtered DataFrame
     """
     try:
+        # Check if this is a UE file - if date_col_name is UE_DATE_COLUMN_VARIATIONS list, it's UE
+        # Also check filename as fallback
+        is_ue_file = False
+        if isinstance(date_col_name, list) and date_col_name is UE_DATE_COLUMN_VARIATIONS:
+            # Direct reference check - if same object, it's UE
+            is_ue_file = True
+        elif isinstance(date_col_name, list):
+            # Compare contents - if same elements, it's UE
+            if len(date_col_name) == len(UE_DATE_COLUMN_VARIATIONS) and all(x in UE_DATE_COLUMN_VARIATIONS for x in date_col_name):
+                is_ue_file = True
+        if 'ue' in file_path.name.lower() or 'ubereats' in file_path.name.lower():
+            is_ue_file = True
+        
         # UE files have headers in row 2 (0-indexed row 1), DD files have headers in row 1
-        if 'ue' in file_path.name.lower():
+        if is_ue_file:
             df = pd.read_csv(file_path, skiprows=[0], header=0)
         else:
             df = pd.read_csv(file_path)
         df.columns = df.columns.str.strip()
         
-        # Handle case-insensitive date column matching
-        if isinstance(date_col_name, str):
-            # If single string, try to find it case-insensitively
-            preferred_names = [date_col_name]
-            # For UE files, also try common variations
-            if 'ue' in file_path.name.lower():
-                preferred_names = UE_DATE_COLUMN_VARIATIONS
-            # For DD files, try common variations of "Timestamp local date"
-            elif 'dd' in file_path.name.lower() or 'doordash' in file_path.name.lower():
-                preferred_names = DD_DATE_COLUMN_VARIATIONS
+        # Handle date column identification
+        if is_ue_file:
+            # For UE files: hardcode to 9th column (index 8) - no variation matching
+            if len(df.columns) > 8:
+                actual_date_col = df.columns[8]
+            else:
+                st.warning(f"UE file {file_path.name} has fewer than 9 columns. Available columns: {list(df.columns)}")
+                return pd.DataFrame()
         else:
-            preferred_names = date_col_name
-        
-        # Find the actual column name
-        actual_date_col = find_date_column(df, preferred_names)
-        
-        if actual_date_col is None:
-            st.warning(f"Date column not found in {file_path.name}. Tried: {preferred_names}. Available columns: {list(df.columns)[:10]}")
-            return pd.DataFrame()
+            # For DD files: use column name matching
+            if isinstance(date_col_name, str):
+                preferred_names = [date_col_name]
+                if 'dd' in file_path.name.lower() or 'doordash' in file_path.name.lower():
+                    preferred_names = DD_DATE_COLUMN_VARIATIONS
+            else:
+                preferred_names = date_col_name
+            
+            # Find the actual column name
+            actual_date_col = find_date_column(df, preferred_names)
+            
+            if actual_date_col is None:
+                st.warning(f"Date column not found in {file_path.name}. Tried: {preferred_names}. Available columns: {list(df.columns)[:10]}")
+                return pd.DataFrame()
         
         # Convert date column to datetime - try multiple formats
         # For UE files, try DD/MM/YYYY format first (common in UberEats exports)
         # For DD files, try YYYY-MM-DD format first (common in DoorDash exports)
-        if 'ue' in file_path.name.lower():
+        if is_ue_file:
             # UberEats: Try DD/MM/YYYY format first
             try:
                 df[actual_date_col] = pd.to_datetime(df[actual_date_col], format='%d/%m/%Y', errors='coerce')

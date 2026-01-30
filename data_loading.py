@@ -3,7 +3,7 @@ import pandas as pd
 import streamlit as st
 from pathlib import Path
 from config import DD_DATA_MASTER, UE_DATA_MASTER, ROOT_DIR
-from utils import filter_master_file_by_date_range, normalize_store_id_column, find_date_column, UE_DATE_COLUMN_VARIATIONS
+from utils import filter_master_file_by_date_range, normalize_store_id_column, filter_excluded_dates
 
 
 def process_master_file_for_dd(file_path, start_date, end_date, excluded_dates=None):
@@ -102,11 +102,44 @@ def process_master_file_for_ue(file_path, start_date, end_date, excluded_dates=N
         Tuple of (sales_agg, payout_agg, orders_agg) DataFrames
     """
     try:
-        # Load and filter by date range using "Order date" column (case-insensitive matching)
-        # Try all common variations: "Order Date", "Order date", "order date", "order Date"
-        df = filter_master_file_by_date_range(file_path, start_date, end_date, 
-                                               UE_DATE_COLUMN_VARIATIONS, 
-                                               excluded_dates)
+        # For UE files: directly use 9th column (index 8) for date - no variation matching
+        # UE files have headers in row 2 (0-indexed row 1)
+        df = pd.read_csv(file_path, skiprows=[0], header=0)
+        df.columns = df.columns.str.strip()
+        
+        # Use 9th column (index 8) as date column
+        if len(df.columns) <= 8:
+            st.error(f"UE file {file_path.name} has fewer than 9 columns. Available columns: {list(df.columns)}")
+            return pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
+        
+        date_col = df.columns[8]  # 9th column
+        
+        # Parse dates - try DD/MM/YYYY format first, then MM/DD/YYYY, then auto
+        df[date_col] = pd.to_datetime(df[date_col], format='%d/%m/%Y', errors='coerce')
+        if df[date_col].isna().all():
+            df[date_col] = pd.to_datetime(df[date_col], format='%m/%d/%Y', errors='coerce')
+        if df[date_col].isna().all():
+            df[date_col] = pd.to_datetime(df[date_col], errors='coerce')
+        
+        df = df.dropna(subset=[date_col])
+        
+        # Parse start and end dates
+        if isinstance(start_date, str):
+            start_dt = pd.to_datetime(start_date, format='%m/%d/%Y')
+        else:
+            start_dt = pd.to_datetime(start_date)
+        
+        if isinstance(end_date, str):
+            end_dt = pd.to_datetime(end_date, format='%m/%d/%Y')
+        else:
+            end_dt = pd.to_datetime(end_date)
+        
+        # Filter by date range
+        df = df[(df[date_col] >= start_dt) & (df[date_col] <= end_dt)]
+        
+        # Apply excluded dates filter
+        if excluded_dates:
+            df = filter_excluded_dates(df, date_col, excluded_dates)
         
         if df.empty:
             return pd.DataFrame(), pd.DataFrame(), pd.DataFrame()

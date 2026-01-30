@@ -455,10 +455,8 @@ def create_combined_store_tables(dd_table1, dd_table2, ue_table1, ue_table2):
     return combined_table1, combined_table2
 
 
-def get_platform_store_tables(sales_df, platform_key, yoy_exclude_stores=None):
-    """Get store-level tables without displaying.
-    yoy_exclude_stores: set/list of Store IDs to exclude from YoY (table2) when post last year is empty.
-    """
+def get_platform_store_tables(sales_df, platform_key):
+    """Get store-level tables without displaying"""
     selected_stores = st.session_state.get(platform_key, sorted(sales_df['Store ID'].unique().tolist()))
     filtered_sales_df = sales_df[sales_df['Store ID'].isin(selected_stores)].copy()
     
@@ -478,12 +476,8 @@ def get_platform_store_tables(sales_df, platform_key, yoy_exclude_stores=None):
         (table1_df['Pre'].fillna(0) != 0) | (table1_df['Post'].fillna(0) != 0)
     ]
     
-    # Table 2 (YoY) - exclude stores with no post last year if yoy_exclude_stores provided
-    t2_sales = filtered_sales_df.copy()
-    if yoy_exclude_stores is not None and len(yoy_exclude_stores) > 0:
-        yoy_exclude_set = {str(s) for s in yoy_exclude_stores}
-        t2_sales = t2_sales[~t2_sales['Store ID'].astype(str).isin(yoy_exclude_set)]
-    table2_df = t2_sales[['Store ID', 'post_24', 'post_25', 'YoY', 'YoY%']].copy()
+    # Table 2 (YoY)
+    table2_df = filtered_sales_df[['Store ID', 'post_24', 'post_25', 'YoY', 'YoY%']].copy()
     table2_df = table2_df.rename(columns={
         'post_24': 'last year-post',
         'post_25': 'post',
