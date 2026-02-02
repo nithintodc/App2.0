@@ -114,12 +114,12 @@ def process_master_file_for_ue(file_path, start_date, end_date, excluded_dates=N
         
         date_col = df.columns[8]  # 9th column
         
-        # Parse dates - try DD/MM/YYYY format first, then MM/DD/YYYY, then auto
-        df[date_col] = pd.to_datetime(df[date_col], format='%d/%m/%Y', errors='coerce')
-        if df[date_col].isna().all():
-            df[date_col] = pd.to_datetime(df[date_col], format='%m/%d/%Y', errors='coerce')
-        if df[date_col].isna().all():
-            df[date_col] = pd.to_datetime(df[date_col], errors='coerce')
+        # Parse dates - UE files always use MM/DD/YYYY format
+        df[date_col] = pd.to_datetime(df[date_col], format='%m/%d/%Y', errors='coerce')
+        # Fall back to auto parsing only if format parsing fails
+        if df[date_col].isna().any():
+            mask_na = df[date_col].isna()
+            df.loc[mask_na, date_col] = pd.to_datetime(df.loc[mask_na, date_col], errors='coerce')
         
         df = df.dropna(subset=[date_col])
         

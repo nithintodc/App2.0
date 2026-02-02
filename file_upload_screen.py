@@ -60,12 +60,13 @@ def extract_file_info(file_path, file_type):
         
         if date_col and date_col in df.columns:
             try:
-                # For UE files, try DD/MM/YYYY format first (common in UberEats exports)
+                # For UE files, always use MM/DD/YYYY format
                 if file_type == 'ue':
-                    df[date_col] = pd.to_datetime(df[date_col], format='%d/%m/%Y', errors='coerce')
-                    if df[date_col].isna().all():
-                        # If all failed, try MM/DD/YYYY format
-                        df[date_col] = pd.to_datetime(df[date_col], format='%m/%d/%Y', errors='coerce')
+                    df[date_col] = pd.to_datetime(df[date_col], format='%m/%d/%Y', errors='coerce')
+                    # Fall back to auto parsing only if format parsing fails
+                    if df[date_col].isna().any():
+                        mask_na = df[date_col].isna()
+                        df.loc[mask_na, date_col] = pd.to_datetime(df.loc[mask_na, date_col], errors='coerce')
                 else:
                     # For DD files, try YYYY-MM-DD format first
                     df[date_col] = pd.to_datetime(df[date_col], format='%Y-%m-%d', errors='coerce')

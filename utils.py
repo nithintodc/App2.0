@@ -177,15 +177,12 @@ def filter_master_file_by_date_range(file_path, start_date, end_date, date_col_n
         # For UE files, try DD/MM/YYYY format first (common in UberEats exports)
         # For DD files, try YYYY-MM-DD format first (common in DoorDash exports)
         if is_ue_file:
-            # UberEats: Try DD/MM/YYYY format first
-            try:
-                df[actual_date_col] = pd.to_datetime(df[actual_date_col], format='%d/%m/%Y', errors='coerce')
-                if df[actual_date_col].isna().all():
-                    # If all failed, try MM/DD/YYYY format
-                    df[actual_date_col] = pd.to_datetime(df[actual_date_col], format='%m/%d/%Y', errors='coerce')
-            except:
-                # Fall back to automatic parsing
-                df[actual_date_col] = pd.to_datetime(df[actual_date_col], errors='coerce')
+            # UberEats: Always uses MM/DD/YYYY format
+            df[actual_date_col] = pd.to_datetime(df[actual_date_col], format='%m/%d/%Y', errors='coerce')
+            # Fall back to auto parsing only if format parsing fails
+            if df[actual_date_col].isna().any():
+                mask_na = df[actual_date_col].isna()
+                df.loc[mask_na, actual_date_col] = pd.to_datetime(df.loc[mask_na, actual_date_col], errors='coerce')
         else:
             # DoorDash: Try YYYY-MM-DD format first
             try:

@@ -395,8 +395,12 @@ def create_date_export(dd_pre_24_path, dd_post_24_path, dd_pre_25_path, dd_post_
                 return pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
             
             # Process ALL data - no filtering by selected stores for date export
-            # Convert date
-            df[date_col] = pd.to_datetime(df[date_col], errors='coerce')
+            # Convert date - UE files always use MM/DD/YYYY format
+            df[date_col] = pd.to_datetime(df[date_col], format='%m/%d/%Y', errors='coerce')
+            # Fall back to auto parsing only if format parsing fails
+            if df[date_col].isna().any():
+                mask_na = df[date_col].isna()
+                df.loc[mask_na, date_col] = pd.to_datetime(df.loc[mask_na, date_col], errors='coerce')
             df = df.dropna(subset=[date_col, store_col])
             
             if len(df) == 0:
@@ -608,8 +612,15 @@ def _create_period_excel_file(df, platform, period_name, store_col, sales_col, p
         if date_col is None or store_col is None or store_col not in df.columns:
             return None
         
-        # Convert date column
-        df[date_col] = pd.to_datetime(df[date_col], errors='coerce')
+        # Convert date column - UE files always use MM/DD/YYYY format
+        if platform == 'UE':
+            df[date_col] = pd.to_datetime(df[date_col], format='%m/%d/%Y', errors='coerce')
+            # Fall back to auto parsing only if format parsing fails
+            if df[date_col].isna().any():
+                mask_na = df[date_col].isna()
+                df.loc[mask_na, date_col] = pd.to_datetime(df.loc[mask_na, date_col], errors='coerce')
+        else:
+            df[date_col] = pd.to_datetime(df[date_col], errors='coerce')
         df = df.dropna(subset=[date_col, store_col])
         
         if df.empty:
