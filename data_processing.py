@@ -257,14 +257,16 @@ def load_and_aggregate_new_customers(excluded_dates=None, pre_start_date=None, p
                     if store_col is None or store_col not in df.columns:
                         continue
                     
-                    # Convert Date column to datetime - try YYYY-MM-DD format first (common in exported files)
-                    try:
-                        df['Date'] = pd.to_datetime(df['Date'], format='%Y-%m-%d', errors='coerce')
-                        if df['Date'].isna().all():
-                            # If all failed, try MM/DD/YYYY format
-                            df['Date'] = pd.to_datetime(df['Date'], format='%m/%d/%Y', errors='coerce')
-                    except:
-                        df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+                    # Convert Date column to datetime - Store original values before parsing
+                    original_dates = df['Date'].copy()
+                    # Try MM/DD/YYYY format first (most common), then YYYY-MM-DD
+                    df['Date'] = pd.to_datetime(df['Date'], format='%m/%d/%Y', errors='coerce')
+                    if df['Date'].isna().all():
+                        # If all failed, try YYYY-MM-DD format using original values
+                        df['Date'] = pd.to_datetime(original_dates, format='%Y-%m-%d', errors='coerce')
+                    # Fall back to auto parsing if format doesn't match
+                    if df['Date'].isna().all():
+                        df['Date'] = pd.to_datetime(original_dates, errors='coerce')
                     
                     df = df.dropna(subset=['Date'])
                     

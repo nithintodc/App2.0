@@ -420,12 +420,14 @@ def create_date_export(dd_pre_24_path, dd_post_24_path, dd_pre_25_path, dd_post_
                 return pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
             
             # Process ALL data - no filtering by selected stores for date export
-            # Convert date - UE files always use MM/DD/YYYY format
+            # Convert date - Store original values before parsing
+            original_dates = df[date_col].copy()
+            # UE files always use MM/DD/YYYY format
             df[date_col] = pd.to_datetime(df[date_col], format='%m/%d/%Y', errors='coerce')
             # Fall back to auto parsing only if format parsing fails
             if df[date_col].isna().any():
                 mask_na = df[date_col].isna()
-                df.loc[mask_na, date_col] = pd.to_datetime(df.loc[mask_na, date_col], errors='coerce')
+                df.loc[mask_na, date_col] = pd.to_datetime(original_dates.loc[mask_na], errors='coerce')
             df = df.dropna(subset=[date_col, store_col])
             
             if len(df) == 0:
@@ -637,15 +639,24 @@ def _create_period_excel_file(df, platform, period_name, store_col, sales_col, p
         if date_col is None or store_col is None or store_col not in df.columns:
             return None
         
-        # Convert date column - UE files always use MM/DD/YYYY format
+        # Convert date column - Store original values before parsing
+        original_dates = df[date_col].copy()
         if platform == 'UE':
+            # UE files always use MM/DD/YYYY format
             df[date_col] = pd.to_datetime(df[date_col], format='%m/%d/%Y', errors='coerce')
             # Fall back to auto parsing only if format parsing fails
             if df[date_col].isna().any():
                 mask_na = df[date_col].isna()
-                df.loc[mask_na, date_col] = pd.to_datetime(df.loc[mask_na, date_col], errors='coerce')
+                df.loc[mask_na, date_col] = pd.to_datetime(original_dates.loc[mask_na], errors='coerce')
         else:
-            df[date_col] = pd.to_datetime(df[date_col], errors='coerce')
+            # DD files: Try MM/DD/YYYY format first (most common), then YYYY-MM-DD
+            df[date_col] = pd.to_datetime(df[date_col], format='%m/%d/%Y', errors='coerce')
+            if df[date_col].isna().all():
+                # If all failed, try YYYY-MM-DD format using original values
+                df[date_col] = pd.to_datetime(original_dates, format='%Y-%m-%d', errors='coerce')
+            # Fall back to auto parsing if format doesn't match
+            if df[date_col].isna().all():
+                df[date_col] = pd.to_datetime(original_dates, errors='coerce')
         df = df.dropna(subset=[date_col, store_col])
         
         if df.empty:
