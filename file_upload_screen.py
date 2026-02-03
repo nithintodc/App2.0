@@ -60,23 +60,26 @@ def extract_file_info(file_path, file_type):
         
         if date_col and date_col in df.columns:
             try:
+                # Store original date column values before parsing
+                original_dates = df[date_col].copy()
+                
                 # For UE files, always use MM/DD/YYYY format
                 if file_type == 'ue':
                     df[date_col] = pd.to_datetime(df[date_col], format='%m/%d/%Y', errors='coerce')
                     # Fall back to auto parsing only if format parsing fails
                     if df[date_col].isna().any():
                         mask_na = df[date_col].isna()
-                        df.loc[mask_na, date_col] = pd.to_datetime(df.loc[mask_na, date_col], errors='coerce')
+                        df.loc[mask_na, date_col] = pd.to_datetime(original_dates.loc[mask_na], errors='coerce')
                 else:
-                    # For DD files, try YYYY-MM-DD format first
-                    df[date_col] = pd.to_datetime(df[date_col], format='%Y-%m-%d', errors='coerce')
+                    # For DD files, try MM/DD/YYYY format first (most common), then YYYY-MM-DD
+                    df[date_col] = pd.to_datetime(df[date_col], format='%m/%d/%Y', errors='coerce')
                     if df[date_col].isna().all():
-                        # If all failed, try MM/DD/YYYY format
-                        df[date_col] = pd.to_datetime(df[date_col], format='%m/%d/%Y', errors='coerce')
+                        # If all failed, try YYYY-MM-DD format using original values
+                        df[date_col] = pd.to_datetime(original_dates, format='%Y-%m-%d', errors='coerce')
                 
                 # Fall back to automatic parsing if format doesn't match
                 if df[date_col].isna().all():
-                    df[date_col] = pd.to_datetime(df[date_col], errors='coerce')
+                    df[date_col] = pd.to_datetime(original_dates, errors='coerce')
                 
                 df_with_dates = df.dropna(subset=[date_col])
                 if len(df_with_dates) > 0:
@@ -84,7 +87,9 @@ def extract_file_info(file_path, file_type):
                     end_date = df_with_dates[date_col].max().date()
             except Exception as e:
                 # If date parsing fails, try to find date column again
-                pass
+                import traceback
+                st.error(f"Error parsing dates: {str(e)}")
+                st.error(traceback.format_exc())
         
         return {
             'start_date': start_date,
