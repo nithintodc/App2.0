@@ -88,10 +88,12 @@ def display_store_tables(platform_name, table1_df, table2_df):
     
     st.subheader(f"Table 1: Current Year Pre vs Post Analysis")
     table1_display = table1_df.copy()
-    # Filter out rows with no data (both Pre and Post are 0 or NaN)
+    # Filter out rows with no data (both Pre and Post are 0 or NaN) or empty Store ID
     if 'Pre' in table1_display.columns and 'Post' in table1_display.columns:
         table1_display = table1_display[
-            (table1_display['Pre'].fillna(0) != 0) | (table1_display['Post'].fillna(0) != 0)
+            (table1_display['Store ID'].notna() if 'Store ID' in table1_display.columns else True) &
+            (table1_display['Store ID'] != '' if 'Store ID' in table1_display.columns else True) &
+            ((table1_display['Pre'].fillna(0) != 0) | (table1_display['Post'].fillna(0) != 0))
         ].copy()  # Use .copy() to ensure we have a clean dataframe
     
     if not table1_display.empty:
@@ -113,10 +115,12 @@ def display_store_tables(platform_name, table1_df, table2_df):
         st.subheader(f"Table 2: Year-over-Year Analysis")
         table2_display = table2_df.copy()
         
-        # Filter out rows with no data (both last year-post and post are 0 or NaN)
+        # Filter out rows with no data (both last year-post and post are 0 or NaN) or empty Store ID
         if 'last year-post' in table2_display.columns and 'post' in table2_display.columns:
             table2_display = table2_display[
-                (table2_display['last year-post'].fillna(0) != 0) | (table2_display['post'].fillna(0) != 0)
+                (table2_display['Store ID'].notna() if 'Store ID' in table2_display.columns else True) &
+                (table2_display['Store ID'] != '' if 'Store ID' in table2_display.columns else True) &
+                ((table2_display['last year-post'].fillna(0) != 0) | (table2_display['post'].fillna(0) != 0))
             ].copy()  # Use .copy() to ensure we have a clean dataframe
         
         if not table2_display.empty:

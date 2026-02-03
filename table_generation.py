@@ -156,25 +156,50 @@ def create_summary_tables(sales_df, payouts_df, orders_df, new_customers_df, sel
     }
     
     # Create Table 1: Pre vs Post
-    table1_data = {
-        'Metric': ['Sales', 'Payouts', 'Orders', 'New Customers', 'Profitability', 'AOV'],
-        'Pre': [sales_summary['pre_25'], payouts_summary['pre_25'], orders_summary['pre_25'], new_customers_summary['pre_25'], profitability_summary['pre_25'], aov_summary['pre_25']],
-        'Post': [sales_summary['post_25'], payouts_summary['post_25'], orders_summary['post_25'], new_customers_summary['post_25'], profitability_summary['post_25'], aov_summary['post_25']],
-        'PrevsPost': [sales_summary['PrevsPost'], payouts_summary['PrevsPost'], orders_summary['PrevsPost'], new_customers_summary['PrevsPost'], profitability_summary['PrevsPost'], aov_summary['PrevsPost']],
-        'LastYear Pre vs Post': [sales_summary['LastYear_Pre_vs_Post'], payouts_summary['LastYear_Pre_vs_Post'], orders_summary['LastYear_Pre_vs_Post'], new_customers_summary['LastYear_Pre_vs_Post'], profitability_summary['LastYear_Pre_vs_Post'], aov_summary['LastYear_Pre_vs_Post']],
-        'Growth%': [sales_summary['Growth%'], payouts_summary['Growth%'], orders_summary['Growth%'], new_customers_summary['Growth%'], profitability_summary['Growth%'], aov_summary['Growth%']]
-    }
+    # For UE, exclude 'New Customers' from the metrics
+    if is_ue:
+        metrics = ['Sales', 'Payouts', 'Orders', 'Profitability', 'AOV']
+        table1_data = {
+            'Metric': metrics,
+            'Pre': [sales_summary['pre_25'], payouts_summary['pre_25'], orders_summary['pre_25'], profitability_summary['pre_25'], aov_summary['pre_25']],
+            'Post': [sales_summary['post_25'], payouts_summary['post_25'], orders_summary['post_25'], profitability_summary['post_25'], aov_summary['post_25']],
+            'PrevsPost': [sales_summary['PrevsPost'], payouts_summary['PrevsPost'], orders_summary['PrevsPost'], profitability_summary['PrevsPost'], aov_summary['PrevsPost']],
+            'LastYear Pre vs Post': [sales_summary['LastYear_Pre_vs_Post'], payouts_summary['LastYear_Pre_vs_Post'], orders_summary['LastYear_Pre_vs_Post'], profitability_summary['LastYear_Pre_vs_Post'], aov_summary['LastYear_Pre_vs_Post']],
+            'Growth%': [sales_summary['Growth%'], payouts_summary['Growth%'], orders_summary['Growth%'], profitability_summary['Growth%'], aov_summary['Growth%']]
+        }
+    else:
+        metrics = ['Sales', 'Payouts', 'Orders', 'New Customers', 'Profitability', 'AOV']
+        table1_data = {
+            'Metric': metrics,
+            'Pre': [sales_summary['pre_25'], payouts_summary['pre_25'], orders_summary['pre_25'], new_customers_summary['pre_25'], profitability_summary['pre_25'], aov_summary['pre_25']],
+            'Post': [sales_summary['post_25'], payouts_summary['post_25'], orders_summary['post_25'], new_customers_summary['post_25'], profitability_summary['post_25'], aov_summary['post_25']],
+            'PrevsPost': [sales_summary['PrevsPost'], payouts_summary['PrevsPost'], orders_summary['PrevsPost'], new_customers_summary['PrevsPost'], profitability_summary['PrevsPost'], aov_summary['PrevsPost']],
+            'LastYear Pre vs Post': [sales_summary['LastYear_Pre_vs_Post'], payouts_summary['LastYear_Pre_vs_Post'], orders_summary['LastYear_Pre_vs_Post'], new_customers_summary['LastYear_Pre_vs_Post'], profitability_summary['LastYear_Pre_vs_Post'], aov_summary['LastYear_Pre_vs_Post']],
+            'Growth%': [sales_summary['Growth%'], payouts_summary['Growth%'], orders_summary['Growth%'], new_customers_summary['Growth%'], profitability_summary['Growth%'], aov_summary['Growth%']]
+        }
     table1_df = pd.DataFrame(table1_data)
     table1_df = table1_df.set_index('Metric')
     
     # Create Table 2: YoY
-    table2_data = {
-        'Metric': ['Sales', 'Payouts', 'Orders', 'New Customers', 'Profitability', 'AOV'],
-        'last year-post': [sales_summary['post_24'], payouts_summary['post_24'], orders_summary['post_24'], new_customers_summary['post_24'], profitability_summary['post_24'], aov_summary['post_24']],
-        'post': [sales_summary['post_25'], payouts_summary['post_25'], orders_summary['post_25'], new_customers_summary['post_25'], profitability_summary['post_25'], aov_summary['post_25']],
-        'YoY': [sales_summary['YoY'], payouts_summary['YoY'], orders_summary['YoY'], new_customers_summary['YoY'], profitability_summary['YoY'], aov_summary['YoY']],
-        'YoY%': [sales_summary['YoY%'], payouts_summary['YoY%'], orders_summary['YoY%'], new_customers_summary['YoY%'], profitability_summary['YoY%'], aov_summary['YoY%']]
-    }
+    # For UE, exclude 'New Customers' from the metrics
+    if is_ue:
+        metrics = ['Sales', 'Payouts', 'Orders', 'Profitability', 'AOV']
+        table2_data = {
+            'Metric': metrics,
+            'last year-post': [sales_summary['post_24'], payouts_summary['post_24'], orders_summary['post_24'], profitability_summary['post_24'], aov_summary['post_24']],
+            'post': [sales_summary['post_25'], payouts_summary['post_25'], orders_summary['post_25'], profitability_summary['post_25'], aov_summary['post_25']],
+            'YoY': [sales_summary['YoY'], payouts_summary['YoY'], orders_summary['YoY'], profitability_summary['YoY'], aov_summary['YoY']],
+            'YoY%': [sales_summary['YoY%'], payouts_summary['YoY%'], orders_summary['YoY%'], profitability_summary['YoY%'], aov_summary['YoY%']]
+        }
+    else:
+        metrics = ['Sales', 'Payouts', 'Orders', 'New Customers', 'Profitability', 'AOV']
+        table2_data = {
+            'Metric': metrics,
+            'last year-post': [sales_summary['post_24'], payouts_summary['post_24'], orders_summary['post_24'], new_customers_summary['post_24'], profitability_summary['post_24'], aov_summary['post_24']],
+            'post': [sales_summary['post_25'], payouts_summary['post_25'], orders_summary['post_25'], new_customers_summary['post_25'], profitability_summary['post_25'], aov_summary['post_25']],
+            'YoY': [sales_summary['YoY'], payouts_summary['YoY'], orders_summary['YoY'], new_customers_summary['YoY'], profitability_summary['YoY'], aov_summary['YoY']],
+            'YoY%': [sales_summary['YoY%'], payouts_summary['YoY%'], orders_summary['YoY%'], new_customers_summary['YoY%'], profitability_summary['YoY%'], aov_summary['YoY%']]
+        }
     table2_df = pd.DataFrame(table2_data)
     table2_df = table2_df.set_index('Metric')
     
@@ -393,10 +418,13 @@ def create_combined_store_tables(dd_table1, dd_table2, ue_table1, ue_table2):
             combined_table1['Growth%'] = (combined_table1['PrevsPost'] / combined_table1['Pre'] * 100).replace([float('inf'), -float('inf')], 0).fillna(0).round(1)
         # Keep only the needed columns
         combined_table1 = combined_table1[['Store ID', 'Pre', 'Post', 'PrevsPost', 'LastYear Pre vs Post', 'Growth%']]
-        # Filter out rows where both Pre and Post are 0 or NaN (no data)
+        # Filter out rows with empty Store ID or where both Pre and Post are 0 or NaN (no data)
         combined_table1 = combined_table1[
-            (combined_table1['Pre'].fillna(0) != 0) | (combined_table1['Post'].fillna(0) != 0)
-        ]
+            (combined_table1['Store ID'].notna()) &
+            (combined_table1['Store ID'] != '') &
+            ((combined_table1['Pre'].fillna(0) != 0) | (combined_table1['Post'].fillna(0) != 0))
+        ].copy()
+        combined_table1 = combined_table1.reset_index(drop=True)
         combined_table1 = combined_table1.set_index('Store ID')
     elif dd_table1 is not None:
         dd_t1 = dd_table1.copy()
@@ -434,10 +462,13 @@ def create_combined_store_tables(dd_table1, dd_table2, ue_table1, ue_table2):
             combined_table2['YoY%'] = (combined_table2['YoY'] / combined_table2['last year-post'] * 100).replace([float('inf'), -float('inf')], 0).fillna(0).round(1)
         # Keep only the needed columns
         combined_table2 = combined_table2[['Store ID', 'last year-post', 'post', 'YoY', 'YoY%']]
-        # Filter out rows where both last year-post and post are 0 or NaN (no data)
+        # Filter out rows with empty Store ID or where both last year-post and post are 0 or NaN (no data)
         combined_table2 = combined_table2[
-            (combined_table2['last year-post'].fillna(0) != 0) | (combined_table2['post'].fillna(0) != 0)
-        ]
+            (combined_table2['Store ID'].notna()) &
+            (combined_table2['Store ID'] != '') &
+            ((combined_table2['last year-post'].fillna(0) != 0) | (combined_table2['post'].fillna(0) != 0))
+        ].copy()
+        combined_table2 = combined_table2.reset_index(drop=True)
         combined_table2 = combined_table2.set_index('Store ID')
     elif dd_table2 is not None:
         dd_t2 = dd_table2.copy()
@@ -472,9 +503,14 @@ def get_platform_store_tables(sales_df, platform_key):
         'LastYear_Pre_vs_Post': 'LastYear Pre vs Post',
         'Growth%': 'Growth%'
     })
+    # Filter out rows with empty Store ID or all zero values
     table1_df = table1_df[
-        (table1_df['Pre'].fillna(0) != 0) | (table1_df['Post'].fillna(0) != 0)
-    ]
+        (table1_df['Store ID'].notna()) & 
+        (table1_df['Store ID'] != '') &
+        ((table1_df['Pre'].fillna(0) != 0) | (table1_df['Post'].fillna(0) != 0))
+    ].copy()
+    # Reset index to remove any gaps
+    table1_df = table1_df.reset_index(drop=True)
     
     # Table 2 (YoY)
     table2_df = filtered_sales_df[['Store ID', 'post_24', 'post_25', 'YoY', 'YoY%']].copy()
@@ -484,9 +520,14 @@ def get_platform_store_tables(sales_df, platform_key):
         'YoY': 'YoY',
         'YoY%': 'YoY%'
     })
+    # Filter out rows with empty Store ID or all zero values
     table2_df = table2_df[
-        (table2_df['last year-post'].fillna(0) != 0) | (table2_df['post'].fillna(0) != 0)
-    ]
+        (table2_df['Store ID'].notna()) & 
+        (table2_df['Store ID'] != '') &
+        ((table2_df['last year-post'].fillna(0) != 0) | (table2_df['post'].fillna(0) != 0))
+    ].copy()
+    # Reset index to remove any gaps
+    table2_df = table2_df.reset_index(drop=True)
     
     return table1_df, table2_df
 

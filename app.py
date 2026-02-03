@@ -597,14 +597,27 @@ def main():
         st.metric("Payouts Increase per store", f"${payouts_per_store:,.1f}", f"Payout pre vs post / {dd_store_count} DD stores")
     
     # Summary Metrics Table
+    # Get date ranges from session state
+    pre_start_date = st.session_state.get("pre_start_date", "")
+    pre_end_date = st.session_state.get("pre_end_date", "")
+    post_start_date = st.session_state.get("post_start_date", "")
+    post_end_date = st.session_state.get("post_end_date", "")
+    
+    pre_date_range = f"{pre_start_date} - {pre_end_date}" if pre_start_date and pre_end_date else ""
+    post_date_range = f"{post_start_date} - {post_end_date}" if post_start_date and post_end_date else ""
+    
     summary_metrics_data = {
-        'Metric': ['Linear Growth', 'YoY Growth', 'DGC', 'New Customers', 'Payouts Increase per store'],
+        'Metric': ['Pre', 'Post', 'Linear Growth', 'YoY Growth', 'DGC', 'New Customers', 'Payouts Increase per store', 'Average Markup', 'Pre TODC Growth YoY'],
         'Value': [
+            pre_date_range,
+            post_date_range,
             f"{linear_growth:.1f}%",
             f"{yoy_growth:.1f}%",
             f"{dgc:.1f}%",
             f"{nc_growth:.1f}%",
-            f"${payouts_per_store:,.1f}"
+            f"${payouts_per_store:,.1f}",
+            "",  # Average Markup - empty value
+            ""   # Pre TODC Growth YoY - empty value
         ]
     }
     summary_metrics_df = pd.DataFrame(summary_metrics_data)
@@ -683,6 +696,8 @@ def main():
     if export_clicked:
         try:
             with st.spinner("🔄 Exporting all tables to Excel..."):
+                pre_date_range_str = f"{pre_start_date} - {pre_end_date}" if pre_start_date and pre_end_date else ""
+                post_date_range_str = f"{post_start_date} - {post_end_date}" if post_start_date and post_end_date else ""
                 file_bytes, filename = export_to_excel(
                     dd_table1, dd_table2, ue_table1, ue_table2,
                     dd_sales_df, dd_payouts_df, dd_orders_df, dd_new_customers_df,
@@ -694,7 +709,11 @@ def main():
                     promotion_table=promotion_table,
                     sponsored_table=sponsored_table,
                     summary_metrics_table=summary_metrics_df,
-                    operator_name=st.session_state.get("operator_name") or None
+                    operator_name=st.session_state.get("operator_name") or None,
+                    sales_pre_post_table=sales_pre_post_table,
+                    sales_yoy_table=sales_yoy_table,
+                    payouts_pre_post_table=payouts_pre_post_table,
+                    payouts_yoy_table=payouts_yoy_table
                 )
                 st.success(f"✅ **Export successful!** Downloading file...")
                 st.download_button(
@@ -716,10 +735,12 @@ def main():
     if combined_store_table1 is not None and not combined_store_table1.empty:
         st.subheader("Combined Table 1: Current Year Pre vs Post Analysis (Store-Level)")
         combined_store1_display = combined_store_table1.reset_index() if combined_store_table1.index.name == 'Store ID' else combined_store_table1.copy()
-        # Filter out rows with no data (both Pre and Post are 0 or NaN)
+        # Filter out rows with no data (both Pre and Post are 0 or NaN) or empty Store ID
         if 'Pre' in combined_store1_display.columns and 'Post' in combined_store1_display.columns:
             combined_store1_display = combined_store1_display[
-                (combined_store1_display['Pre'].fillna(0) != 0) | (combined_store1_display['Post'].fillna(0) != 0)
+                (combined_store1_display['Store ID'].notna() if 'Store ID' in combined_store1_display.columns else True) &
+                (combined_store1_display['Store ID'] != '' if 'Store ID' in combined_store1_display.columns else True) &
+                ((combined_store1_display['Pre'].fillna(0) != 0) | (combined_store1_display['Post'].fillna(0) != 0))
             ].copy()  # Use .copy() to ensure we have a clean dataframe
         # Only display if there's data after filtering
         if not combined_store1_display.empty and 'Pre' in combined_store1_display.columns:
@@ -747,10 +768,12 @@ def main():
         st.subheader("Combined Table 2: Year-over-Year Analysis (Store-Level)")
         combined_store2_display = combined_store_table2.reset_index() if combined_store_table2.index.name == 'Store ID' else combined_store_table2.copy()
         
-        # Filter out rows with no data (both last year-post and post are 0 or NaN)
+        # Filter out rows with no data (both last year-post and post are 0 or NaN) or empty Store ID
         if 'last year-post' in combined_store2_display.columns and 'post' in combined_store2_display.columns:
             combined_store2_display = combined_store2_display[
-                (combined_store2_display['last year-post'].fillna(0) != 0) | (combined_store2_display['post'].fillna(0) != 0)
+                (combined_store2_display['Store ID'].notna() if 'Store ID' in combined_store2_display.columns else True) &
+                (combined_store2_display['Store ID'] != '' if 'Store ID' in combined_store2_display.columns else True) &
+                ((combined_store2_display['last year-post'].fillna(0) != 0) | (combined_store2_display['post'].fillna(0) != 0))
             ].copy()  # Use .copy() to ensure we have a clean dataframe
         
         # Only display if there's data after filtering
@@ -902,12 +925,12 @@ def main():
         corporate_display['Cost per Order'] = corporate_display['Cost per Order'].apply(lambda x: f"${x:,.2f}" if pd.notna(x) else "$0.00")
         
         # Rename index for display (False = Corporate, True = TODC)
-        corporate_display.index.name = 'Is Self Serve Campaign'
+        corporate_display.index.name = 'Campaign'
         corporate_display = corporate_display.reset_index()
-        corporate_display['Is Self Serve Campaign'] = corporate_display['Is Self Serve Campaign'].apply(
+        corporate_display['Campaign'] = corporate_display['Campaign'].apply(
             lambda x: 'Corporate' if x == False else ('TODC' if x == True else str(x))
         )
-        corporate_display = corporate_display.set_index('Is Self Serve Campaign')
+        corporate_display = corporate_display.set_index('Campaign')
         
         st.dataframe(corporate_display, width='stretch', height=200)
         
@@ -920,12 +943,12 @@ def main():
                 promo_display['Spend'] = promo_display['Spend'].apply(lambda x: f"${x:,.2f}" if pd.notna(x) else "$0.00")
                 promo_display['ROAS'] = promo_display['ROAS'].apply(lambda x: f"{x:.2f}" if pd.notna(x) else "0.00")
                 promo_display['Cost per Order'] = promo_display['Cost per Order'].apply(lambda x: f"${x:,.2f}" if pd.notna(x) else "$0.00")
-                promo_display.index.name = 'Is Self Serve Campaign'
+                promo_display.index.name = 'Campaign'
                 promo_display = promo_display.reset_index()
-                promo_display['Is Self Serve Campaign'] = promo_display['Is Self Serve Campaign'].apply(
+                promo_display['Campaign'] = promo_display['Campaign'].apply(
                     lambda x: 'Corporate' if x == False else ('TODC' if x == True else str(x))
                 )
-                promo_display = promo_display.set_index('Is Self Serve Campaign')
+                promo_display = promo_display.set_index('Campaign')
                 st.dataframe(promo_display, width='stretch')
             else:
                 st.info("No promotion data available")
@@ -938,17 +961,78 @@ def main():
                 sponsored_display['Spend'] = sponsored_display['Spend'].apply(lambda x: f"${x:,.2f}" if pd.notna(x) else "$0.00")
                 sponsored_display['ROAS'] = sponsored_display['ROAS'].apply(lambda x: f"{x:.2f}" if pd.notna(x) else "0.00")
                 sponsored_display['Cost per Order'] = sponsored_display['Cost per Order'].apply(lambda x: f"${x:,.2f}" if pd.notna(x) else "$0.00")
-                sponsored_display.index.name = 'Is Self Serve Campaign'
+                sponsored_display.index.name = 'Campaign'
                 sponsored_display = sponsored_display.reset_index()
-                sponsored_display['Is Self Serve Campaign'] = sponsored_display['Is Self Serve Campaign'].apply(
+                sponsored_display['Campaign'] = sponsored_display['Campaign'].apply(
                     lambda x: 'Corporate' if x == False else ('TODC' if x == True else str(x))
                 )
-                sponsored_display = sponsored_display.set_index('Is Self Serve Campaign')
+                sponsored_display = sponsored_display.set_index('Campaign')
                 st.dataframe(sponsored_display, width='stretch')
             else:
                 st.info("No sponsored listing data available")
     else:
         st.info("No marketing data available. Please ensure marketing_* folders exist with MARKETING_PROMOTION and MARKETING_SPONSORED_LISTING files.")
+    
+    st.divider()
+    
+    # 8. Slot-based Analysis Tables
+    st.header("⏰ Slot-based Analysis")
+    sales_pre_post_table = None
+    sales_yoy_table = None
+    payouts_pre_post_table = None
+    payouts_yoy_table = None
+    
+    if dd_data_path and Path(dd_data_path).exists():
+        from slot_analysis import process_slot_analysis
+        
+        try:
+            sales_pre_post_table, sales_yoy_table, payouts_pre_post_table, payouts_yoy_table = process_slot_analysis(
+                dd_data_path,
+                pre_start_date=pre_start,
+                pre_end_date=pre_end,
+                post_start_date=post_start,
+                post_end_date=post_end,
+                excluded_dates=excluded_dates
+            )
+            
+            # Display Table 1: Sales Pre/Post
+            st.subheader("Table 1: Sales - Pre vs Post")
+            sales_pre_post_display = sales_pre_post_table.copy()
+            sales_pre_post_display['Pre'] = sales_pre_post_display['Pre'].apply(lambda x: f"${x:,.2f}")
+            sales_pre_post_display['Post'] = sales_pre_post_display['Post'].apply(lambda x: f"${x:,.2f}")
+            sales_pre_post_display['Pre vs Post'] = sales_pre_post_display['Pre vs Post'].apply(lambda x: f"${x:,.2f}")
+            st.dataframe(sales_pre_post_display, use_container_width=True, hide_index=True)
+            
+            # Display Table 2: Sales YoY
+            st.subheader("Table 2: Sales - Year over Year")
+            sales_yoy_display = sales_yoy_table.copy()
+            sales_yoy_display['Last year post'] = sales_yoy_display['Last year post'].apply(lambda x: f"${x:,.2f}")
+            sales_yoy_display['Post'] = sales_yoy_display['Post'].apply(lambda x: f"${x:,.2f}")
+            sales_yoy_display['YoY'] = sales_yoy_display['YoY'].apply(lambda x: f"${x:,.2f}")
+            st.dataframe(sales_yoy_display, use_container_width=True, hide_index=True)
+            
+            # Display Table 3: Payouts Pre/Post
+            st.subheader("Table 3: Payouts - Pre vs Post")
+            payouts_pre_post_display = payouts_pre_post_table.copy()
+            payouts_pre_post_display['Pre'] = payouts_pre_post_display['Pre'].apply(lambda x: f"${x:,.2f}")
+            payouts_pre_post_display['Post'] = payouts_pre_post_display['Post'].apply(lambda x: f"${x:,.2f}")
+            payouts_pre_post_display['Pre vs Post'] = payouts_pre_post_display['Pre vs Post'].apply(lambda x: f"${x:,.2f}")
+            st.dataframe(payouts_pre_post_display, use_container_width=True, hide_index=True)
+            
+            # Display Table 4: Payouts YoY
+            st.subheader("Table 4: Payouts - Year over Year")
+            payouts_yoy_display = payouts_yoy_table.copy()
+            payouts_yoy_display['Last year post'] = payouts_yoy_display['Last year post'].apply(lambda x: f"${x:,.2f}")
+            payouts_yoy_display['Post'] = payouts_yoy_display['Post'].apply(lambda x: f"${x:,.2f}")
+            payouts_yoy_display['YoY'] = payouts_yoy_display['YoY'].apply(lambda x: f"${x:,.2f}")
+            st.dataframe(payouts_yoy_display, use_container_width=True, hide_index=True)
+            
+        except Exception as e:
+            st.error(f"Error generating slot-based analysis: {str(e)}")
+            import traceback
+            st.error(traceback.format_exc())
+    else:
+        st.info("DoorDash financial file not available for slot-based analysis.")
 
 if __name__ == "__main__":
     main()

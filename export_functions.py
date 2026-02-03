@@ -21,7 +21,8 @@ def export_to_excel(dd_table1, dd_table2, ue_table1, ue_table2,
                      dd_selected_stores, ue_selected_stores,
                      combined_summary1, combined_summary2, combined_store_table1, combined_store_table2,
                      corporate_todc_table=None, promotion_table=None, sponsored_table=None,
-                     summary_metrics_table=None, operator_name=None):
+                     summary_metrics_table=None, operator_name=None,
+                     sales_pre_post_table=None, sales_yoy_table=None, payouts_pre_post_table=None, payouts_yoy_table=None):
     """Export all tables to an Excel file with sheets: Summary Tables, Store-Level Tables, and Corporate vs TODC"""
     # Use temp directory for file creation (will be downloaded, not saved to disk)
     import tempfile
@@ -54,11 +55,11 @@ def export_to_excel(dd_table1, dd_table2, ue_table1, ue_table2,
         ws.cell(row=start_row, column=1).font = Font(bold=True, size=12)
         start_row += 1
         # Add table data
-        # Check if Store ID, Metric, or Is Self Serve Campaign is in index
-        if df.index.name in ['Store ID', 'Metric', 'Is Self Serve Campaign'] or (hasattr(df.index, 'name') and df.index.name):
+        # Check if Store ID, Metric, or Campaign is in index
+        if df.index.name in ['Store ID', 'Metric', 'Campaign', 'Is Self Serve Campaign'] or (hasattr(df.index, 'name') and df.index.name):
             # Reset index to include it as a column
             df_display = df.reset_index()
-        elif 'Store ID' not in df.columns and 'Metric' not in df.columns and 'Is Self Serve Campaign' not in df.columns:
+        elif 'Store ID' not in df.columns and 'Metric' not in df.columns and 'Campaign' not in df.columns and 'Is Self Serve Campaign' not in df.columns:
             # Try to reset index if it exists
             try:
                 df_display = df.reset_index()
@@ -111,7 +112,7 @@ def export_to_excel(dd_table1, dd_table2, ue_table1, ue_table2,
                     # Format as percentage with % symbol
                     if isinstance(value, (int, float)):
                         cell.value = f"{value:.1f}%"
-                elif col_name in ['Store ID', 'Metric', 'Is Self Serve Campaign']:
+                elif col_name in ['Store ID', 'Metric', 'Campaign', 'Is Self Serve Campaign']:
                     # Keep as is (text)
                     pass
                 elif col_name == 'Orders':
@@ -217,38 +218,62 @@ def export_to_excel(dd_table1, dd_table2, ue_table1, ue_table2,
         current_row = 1
         
         # Add Combined Corporate vs TODC table
-        # Prepare the table for export (reset index to include Is Self Serve Campaign as column)
+        # Prepare the table for export (reset index to include Campaign as column)
         corporate_export = corporate_todc_table.copy()
-        corporate_export.index.name = 'Is Self Serve Campaign'
+        corporate_export.index.name = 'Campaign'
         corporate_export = corporate_export.reset_index()
-        corporate_export['Is Self Serve Campaign'] = corporate_export['Is Self Serve Campaign'].apply(
+        corporate_export['Campaign'] = corporate_export['Campaign'].apply(
             lambda x: 'Corporate' if x == False else ('TODC' if x == True else str(x))
         )
-        corporate_export = corporate_export.set_index('Is Self Serve Campaign')
+        corporate_export = corporate_export.set_index('Campaign')
         
         current_row = add_table_to_sheet(ws_corporate, "Combined: Corporate vs TODC", corporate_export, current_row)
         
         # Add Promotion table if available
         if promotion_table is not None and not promotion_table.empty:
             promo_export = promotion_table.copy()
-            promo_export.index.name = 'Is Self Serve Campaign'
+            promo_export.index.name = 'Campaign'
             promo_export = promo_export.reset_index()
-            promo_export['Is Self Serve Campaign'] = promo_export['Is Self Serve Campaign'].apply(
+            promo_export['Campaign'] = promo_export['Campaign'].apply(
                 lambda x: 'Corporate' if x == False else ('TODC' if x == True else str(x))
             )
-            promo_export = promo_export.set_index('Is Self Serve Campaign')
+            promo_export = promo_export.set_index('Campaign')
             current_row = add_table_to_sheet(ws_corporate, "Promotion: Corporate vs TODC", promo_export, current_row)
         
         # Add Sponsored Listing table if available
         if sponsored_table is not None and not sponsored_table.empty:
             sponsored_export = sponsored_table.copy()
-            sponsored_export.index.name = 'Is Self Serve Campaign'
+            sponsored_export.index.name = 'Campaign'
             sponsored_export = sponsored_export.reset_index()
-            sponsored_export['Is Self Serve Campaign'] = sponsored_export['Is Self Serve Campaign'].apply(
+            sponsored_export['Campaign'] = sponsored_export['Campaign'].apply(
                 lambda x: 'Corporate' if x == False else ('TODC' if x == True else str(x))
             )
-            sponsored_export = sponsored_export.set_index('Is Self Serve Campaign')
+            sponsored_export = sponsored_export.set_index('Campaign')
             current_row = add_table_to_sheet(ws_corporate, "Sponsored Listing: Corporate vs TODC", sponsored_export, current_row)
+    
+    # Add Slot-based Analysis sheet
+    if sales_pre_post_table is not None or sales_yoy_table is not None or payouts_pre_post_table is not None or payouts_yoy_table is not None:
+        ws_slots = wb.create_sheet("Slot-based Analysis")
+        current_row = 1
+        
+        # Add Table 1: Sales Pre/Post
+        if sales_pre_post_table is not None and not sales_pre_post_table.empty:
+            current_row = add_table_to_sheet(ws_slots, "Table 1: Sales - Pre vs Post", sales_pre_post_table, current_row)
+            current_row += 2
+        
+        # Add Table 2: Sales YoY
+        if sales_yoy_table is not None and not sales_yoy_table.empty:
+            current_row = add_table_to_sheet(ws_slots, "Table 2: Sales - Year over Year", sales_yoy_table, current_row)
+            current_row += 2
+        
+        # Add Table 3: Payouts Pre/Post
+        if payouts_pre_post_table is not None and not payouts_pre_post_table.empty:
+            current_row = add_table_to_sheet(ws_slots, "Table 3: Payouts - Pre vs Post", payouts_pre_post_table, current_row)
+            current_row += 2
+        
+        # Add Table 4: Payouts YoY
+        if payouts_yoy_table is not None and not payouts_yoy_table.empty:
+            current_row = add_table_to_sheet(ws_slots, "Table 4: Payouts - Year over Year", payouts_yoy_table, current_row)
     
     # Generate filename with timestamp (use operator name if provided)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
