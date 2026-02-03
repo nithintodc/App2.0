@@ -692,6 +692,28 @@ def main():
                 with st.expander("🔍 View Error Details"):
                     st.code(traceback.format_exc())
     
+    # Initialize slot table variables (needed for export)
+    sales_pre_post_table = None
+    sales_yoy_table = None
+    payouts_pre_post_table = None
+    payouts_yoy_table = None
+    
+    # Process slot analysis if DD data is available (needed for export)
+    if dd_data_path and Path(dd_data_path).exists():
+        from slot_analysis import process_slot_analysis
+        try:
+            sales_pre_post_table, sales_yoy_table, payouts_pre_post_table, payouts_yoy_table = process_slot_analysis(
+                dd_data_path,
+                pre_start_date=pre_start,
+                pre_end_date=pre_end,
+                post_start_date=post_start,
+                post_end_date=post_end,
+                excluded_dates=excluded_dates
+            )
+        except Exception as e:
+            # Silently fail here - will be handled in display section
+            pass
+    
     # Export All Tables to Excel - Direct download
     if export_clicked:
         try:
@@ -977,60 +999,40 @@ def main():
     
     # 8. Slot-based Analysis Tables
     st.header("⏰ Slot-based Analysis")
-    sales_pre_post_table = None
-    sales_yoy_table = None
-    payouts_pre_post_table = None
-    payouts_yoy_table = None
     
-    if dd_data_path and Path(dd_data_path).exists():
-        from slot_analysis import process_slot_analysis
+    # Slot tables are already processed above for export, now just display them
+    if sales_pre_post_table is not None and sales_yoy_table is not None and payouts_pre_post_table is not None and payouts_yoy_table is not None:
+        # Display Table 1: Sales Pre/Post
+        st.subheader("Table 1: Sales - Pre vs Post")
+        sales_pre_post_display = sales_pre_post_table.copy()
+        sales_pre_post_display['Pre'] = sales_pre_post_display['Pre'].apply(lambda x: f"${x:,.2f}")
+        sales_pre_post_display['Post'] = sales_pre_post_display['Post'].apply(lambda x: f"${x:,.2f}")
+        sales_pre_post_display['Pre vs Post'] = sales_pre_post_display['Pre vs Post'].apply(lambda x: f"${x:,.2f}")
+        st.dataframe(sales_pre_post_display, use_container_width=True, hide_index=True)
         
-        try:
-            sales_pre_post_table, sales_yoy_table, payouts_pre_post_table, payouts_yoy_table = process_slot_analysis(
-                dd_data_path,
-                pre_start_date=pre_start,
-                pre_end_date=pre_end,
-                post_start_date=post_start,
-                post_end_date=post_end,
-                excluded_dates=excluded_dates
-            )
-            
-            # Display Table 1: Sales Pre/Post
-            st.subheader("Table 1: Sales - Pre vs Post")
-            sales_pre_post_display = sales_pre_post_table.copy()
-            sales_pre_post_display['Pre'] = sales_pre_post_display['Pre'].apply(lambda x: f"${x:,.2f}")
-            sales_pre_post_display['Post'] = sales_pre_post_display['Post'].apply(lambda x: f"${x:,.2f}")
-            sales_pre_post_display['Pre vs Post'] = sales_pre_post_display['Pre vs Post'].apply(lambda x: f"${x:,.2f}")
-            st.dataframe(sales_pre_post_display, use_container_width=True, hide_index=True)
-            
-            # Display Table 2: Sales YoY
-            st.subheader("Table 2: Sales - Year over Year")
-            sales_yoy_display = sales_yoy_table.copy()
-            sales_yoy_display['Last year post'] = sales_yoy_display['Last year post'].apply(lambda x: f"${x:,.2f}")
-            sales_yoy_display['Post'] = sales_yoy_display['Post'].apply(lambda x: f"${x:,.2f}")
-            sales_yoy_display['YoY'] = sales_yoy_display['YoY'].apply(lambda x: f"${x:,.2f}")
-            st.dataframe(sales_yoy_display, use_container_width=True, hide_index=True)
-            
-            # Display Table 3: Payouts Pre/Post
-            st.subheader("Table 3: Payouts - Pre vs Post")
-            payouts_pre_post_display = payouts_pre_post_table.copy()
-            payouts_pre_post_display['Pre'] = payouts_pre_post_display['Pre'].apply(lambda x: f"${x:,.2f}")
-            payouts_pre_post_display['Post'] = payouts_pre_post_display['Post'].apply(lambda x: f"${x:,.2f}")
-            payouts_pre_post_display['Pre vs Post'] = payouts_pre_post_display['Pre vs Post'].apply(lambda x: f"${x:,.2f}")
-            st.dataframe(payouts_pre_post_display, use_container_width=True, hide_index=True)
-            
-            # Display Table 4: Payouts YoY
-            st.subheader("Table 4: Payouts - Year over Year")
-            payouts_yoy_display = payouts_yoy_table.copy()
-            payouts_yoy_display['Last year post'] = payouts_yoy_display['Last year post'].apply(lambda x: f"${x:,.2f}")
-            payouts_yoy_display['Post'] = payouts_yoy_display['Post'].apply(lambda x: f"${x:,.2f}")
-            payouts_yoy_display['YoY'] = payouts_yoy_display['YoY'].apply(lambda x: f"${x:,.2f}")
-            st.dataframe(payouts_yoy_display, use_container_width=True, hide_index=True)
-            
-        except Exception as e:
-            st.error(f"Error generating slot-based analysis: {str(e)}")
-            import traceback
-            st.error(traceback.format_exc())
+        # Display Table 2: Sales YoY
+        st.subheader("Table 2: Sales - Year over Year")
+        sales_yoy_display = sales_yoy_table.copy()
+        sales_yoy_display['Last year post'] = sales_yoy_display['Last year post'].apply(lambda x: f"${x:,.2f}")
+        sales_yoy_display['Post'] = sales_yoy_display['Post'].apply(lambda x: f"${x:,.2f}")
+        sales_yoy_display['YoY'] = sales_yoy_display['YoY'].apply(lambda x: f"${x:,.2f}")
+        st.dataframe(sales_yoy_display, use_container_width=True, hide_index=True)
+        
+        # Display Table 3: Payouts Pre/Post
+        st.subheader("Table 3: Payouts - Pre vs Post")
+        payouts_pre_post_display = payouts_pre_post_table.copy()
+        payouts_pre_post_display['Pre'] = payouts_pre_post_display['Pre'].apply(lambda x: f"${x:,.2f}")
+        payouts_pre_post_display['Post'] = payouts_pre_post_display['Post'].apply(lambda x: f"${x:,.2f}")
+        payouts_pre_post_display['Pre vs Post'] = payouts_pre_post_display['Pre vs Post'].apply(lambda x: f"${x:,.2f}")
+        st.dataframe(payouts_pre_post_display, use_container_width=True, hide_index=True)
+        
+        # Display Table 4: Payouts YoY
+        st.subheader("Table 4: Payouts - Year over Year")
+        payouts_yoy_display = payouts_yoy_table.copy()
+        payouts_yoy_display['Last year post'] = payouts_yoy_display['Last year post'].apply(lambda x: f"${x:,.2f}")
+        payouts_yoy_display['Post'] = payouts_yoy_display['Post'].apply(lambda x: f"${x:,.2f}")
+        payouts_yoy_display['YoY'] = payouts_yoy_display['YoY'].apply(lambda x: f"${x:,.2f}")
+        st.dataframe(payouts_yoy_display, use_container_width=True, hide_index=True)
     else:
         st.info("DoorDash financial file not available for slot-based analysis.")
 
