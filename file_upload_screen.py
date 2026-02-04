@@ -531,12 +531,12 @@ def display_file_upload_screen():
     dates_provided = pre_range and post_range
     
     if not all_files_uploaded:
-        st.warning("⚠️ Please upload all required files before proceeding.")
+        st.info("ℹ️ Some files are missing. Analysis will proceed with available data only.")
     
     if not dates_provided:
         st.warning("⚠️ Please enter both Pre and Post date ranges before proceeding.")
     
-    if st.button("🚀 Start Analysis", type="primary", disabled=not (all_files_uploaded and dates_provided)):
+    if st.button("🚀 Start Analysis", type="primary", disabled=not dates_provided):
         # Validate and parse dates
         valid = True
         
@@ -590,7 +590,9 @@ def display_file_upload_screen():
                 st.error(f"Invalid Post date range format: {post_range}. Use: MM/DD/YYYY-MM/DD/YYYY")
                 valid = False
         
-        if valid and all_files_uploaded and dates_provided:
+        if valid and dates_provided:
             st.session_state["operator_name"] = operator_name.strip() if (operator_name and str(operator_name).strip()) else ""
             st.session_state["current_screen"] = "dashboard"
             st.rerun()
+        elif not dates_provided:
+            st.error("⚠️ Date ranges are required to start analysis.")

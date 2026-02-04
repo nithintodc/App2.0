@@ -211,11 +211,18 @@ def main():
             st.markdown("**📊 Dashboard** (Current)")
         else:
             if st.button("📊 Dashboard", key="nav_dashboard"):
-                if st.session_state.get("uploaded_dd_data") and st.session_state.get("uploaded_ue_data"):
+                # Allow navigation to dashboard if date ranges are set, even without all files
+                pre_start = st.session_state.get("pre_start_date", "")
+                pre_end = st.session_state.get("pre_end_date", "")
+                post_start = st.session_state.get("post_start_date", "")
+                post_end = st.session_state.get("post_end_date", "")
+                dates_set = bool(pre_start and pre_end and post_start and post_end)
+                
+                if dates_set:
                     st.session_state["current_screen"] = "dashboard"
                     st.rerun()
                 else:
-                    st.warning("⚠️ Please upload files first")
+                    st.warning("⚠️ Please set date ranges first (use 'Start Analysis' button after entering dates)")
     
     # Display appropriate screen
     if current_screen == "upload":
