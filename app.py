@@ -613,9 +613,27 @@ def main():
     pre_date_range = f"{pre_start_date} - {pre_end_date}" if pre_start_date and pre_end_date else ""
     post_date_range = f"{post_start_date} - {post_end_date}" if post_start_date and post_end_date else ""
     
+    # Get store counts
+    dd_stores = st.session_state.get("selected_stores_DoorDash", [])
+    ue_stores = st.session_state.get("selected_stores_UberEats", [])
+    dd_store_count = len(dd_stores) if dd_stores else 0
+    ue_store_count = len(ue_stores) if ue_stores else 0
+    
     summary_metrics_data = {
-        'Metric': ['Pre', 'Post', 'Linear Growth', 'YoY Growth', 'DGC', 'New Customers', 'Payouts Increase per store', 'Average Markup', 'Pre TODC Growth YoY'],
+        'Metric': [
+            'Stores',
+            'Pre',
+            'Post',
+            'Linear Growth',
+            'YoY Growth',
+            'DGC',
+            'New Customers',
+            'Payouts Increase per store',
+            'Average Markup',
+            'Pre TODC Growth YoY'
+        ],
         'Value': [
+            f"DD: {dd_store_count}, UE: {ue_store_count}",
             pre_date_range,
             post_date_range,
             f"{linear_growth:.1f}%",
@@ -629,6 +647,15 @@ def main():
     }
     summary_metrics_df = pd.DataFrame(summary_metrics_data)
     st.dataframe(summary_metrics_df, use_container_width=True, hide_index=True)
+    
+    # Build Merchant Store IDs / Markups table (export only, not shown in Streamlit)
+    dd_stores_list = st.session_state.get("selected_stores_DoorDash", []) or []
+    ue_stores_list = st.session_state.get("selected_stores_UberEats", []) or []
+    all_store_ids = list(dict.fromkeys([str(s) for s in dd_stores_list] + [str(s) for s in ue_stores_list]))
+    store_ids_markups_df = pd.DataFrame({
+        "Merchant Store IDs": all_store_ids,
+        "Markups": [""] * len(all_store_ids)
+    }) if all_store_ids else pd.DataFrame(columns=["Merchant Store IDs", "Markups"])
     
     st.divider()
     
@@ -683,12 +710,12 @@ def main():
                         operator_name=st.session_state.get("operator_name") or None
                     )
                     if excel_bytes and excel_filename:
-                        st.success(f"✅ **Date Export successful!** Downloading zip file with 8 Excel files...")
+                        st.success(f"✅ **Date Export successful!** Downloading Excel file with 8 sheets...")
                         st.download_button(
-                            label="📥 Download Date Export (ZIP)",
+                            label="📥 Download Date Export (Excel)",
                             data=excel_bytes,
                             file_name=excel_filename,
-                            mime="application/zip",
+                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                             type="primary"
                         )
                     else:
@@ -738,6 +765,7 @@ def main():
                     promotion_table=promotion_table,
                     sponsored_table=sponsored_table,
                     summary_metrics_table=summary_metrics_df,
+                    store_ids_markups_table=store_ids_markups_df,
                     operator_name=st.session_state.get("operator_name") or None,
                     sales_pre_post_table=sales_pre_post_table,
                     sales_yoy_table=sales_yoy_table,

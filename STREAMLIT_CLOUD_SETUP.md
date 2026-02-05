@@ -2,6 +2,39 @@
 
 This guide explains how to deploy your app to Streamlit Cloud and configure Google Drive credentials.
 
+---
+
+## ⚠️ "Credentials not found" in production
+
+If you see **"Service account credentials not found at: .../todc-marketing-....json"** on Streamlit Cloud:
+
+1. Open your app on [share.streamlit.io](https://share.streamlit.io) → click **⋮** (three dots) → **Settings**.
+2. Scroll to **Secrets** and click **Edit** (or **Open in editor**).
+3. Paste your GCP service account in **TOML** form. You need both section headers and all keys from your JSON:
+
+```toml
+[gcp]
+[gcp.service_account]
+type = "service_account"
+project_id = "your-actual-project-id"
+private_key_id = "your-actual-private-key-id"
+private_key = """-----BEGIN PRIVATE KEY-----
+paste every line of the key here
+-----END PRIVATE KEY-----"""
+client_email = "your-sa@your-project.iam.gserviceaccount.com"
+client_id = "your-client-id"
+auth_uri = "https://accounts.google.com/o/oauth2/auth"
+token_uri = "https://oauth2.googleapis.com/token"
+auth_provider_x509_cert_url = "https://www.googleapis.com/oauth2/v1/certs"
+client_x509_cert_url = "https://www.googleapis.com/robot/v1/metadata/x509/your-sa%40your-project.iam.gserviceaccount.com"
+```
+
+4. Copy each value from your **downloaded JSON key** (from Google Cloud Console → IAM → Service accounts → Keys).
+5. Use **triple quotes** `"""` around `private_key` and keep the newlines inside it.
+6. Save. The app will redeploy; reload the app page.
+
+---
+
 ## 🚀 Deploy to Streamlit Cloud
 
 ### Step 1: Push Code to GitHub

@@ -2,6 +2,7 @@
 Google Drive utility functions for uploading files and managing folders.
 """
 import os
+import json
 from pathlib import Path
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
@@ -24,29 +25,30 @@ class GoogleDriveManager:
             credentials_path: Path to service account JSON file. 
                             If None, looks for todc-marketing-ad02212d4f16.json in app folder.
         """
-        # Try Streamlit Cloud secrets first
+        # 1) Try Streamlit Cloud secrets (production)
         credentials_info = None
         try:
-            # Check if running on Streamlit Cloud with secrets
             if hasattr(st, 'secrets'):
                 try:
-                    # Try to access gcp_service_account directly (new format)
                     if 'gcp_service_account' in st.secrets:
                         credentials_info = dict(st.secrets['gcp_service_account'])
-                        st.info("✅ Using credentials from Streamlit Cloud secrets")
-                    # Fallback to nested structure (old format)
                     elif hasattr(st.secrets, 'gcp') and hasattr(st.secrets.gcp, 'service_account'):
                         credentials_info = dict(st.secrets.gcp.service_account)
-                        st.info("✅ Using credentials from Streamlit Cloud secrets")
                 except (KeyError, AttributeError):
                     pass
         except Exception:
             pass
         
-        # If no secrets, try file path
+        # 2) Try environment variable (e.g. GCP_SERVICE_ACCOUNT_JSON in Streamlit Cloud)
+        if credentials_info is None and os.environ.get('GCP_SERVICE_ACCOUNT_JSON'):
+            try:
+                credentials_info = json.loads(os.environ['GCP_SERVICE_ACCOUNT_JSON'])
+            except (json.JSONDecodeError, KeyError):
+                pass
+        
+        # 3) Try file path (local / VM)
         if credentials_info is None:
             if credentials_path is None:
-                # Default to the service account file in app folder
                 app_dir = Path(__file__).parent
                 credentials_path = app_dir / "todc-marketing-ad02212d4f16.json"
             
@@ -54,25 +56,41 @@ class GoogleDriveManager:
             
             if not self.credentials_path.exists():
                 raise FileNotFoundError(
-                    f"Service account credentials not found at: {self.credentials_path}\n"
-                    "For Streamlit Cloud: Add credentials to Streamlit Cloud secrets.\n"
-                    "For local/VM: Place todc-marketing-*.json file in app folder."
+                    f"Service account credentials not found at: {self.credentials_path}\n\n"
+                    "For PRODUCTION (Streamlit Cloud):\n"
+                    "  1. Open your app → ⋮ → Settings → Secrets\n"
+                    "  2. Paste the contents below (use your real JSON values):\n\n"
+                    "[gcp]\n"
+                    "[gcp.service_account]\n"
+                    'type = "service_account"\n'
+                    'project_id = "your-project-id"\n'
+                    'private_key_id = "your-private-key-id"\n'
+                    'private_key = """-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----"""\n'
+                    'client_email = "your-sa@project.iam.gserviceaccount.com"\n'
+                    'client_id = "..."\n'
+                    'auth_uri = "https://accounts.google.com/o/oauth2/auth"\n'
+                    'token_uri = "https://oauth2.googleapis.com/token"\n'
+                    'auth_provider_x509_cert_url = "https://www.googleapis.com/oauth2/v1/certs"\n'
+                    'client_x509_cert_url = "https://www.googleapis.com/robot/v1/metadata/x509/..."\n\n'
+                    "  See app/STREAMLIT_CLOUD_SETUP.md for full steps.\n\n"
+                    "For local/VM: Place todc-marketing-*.json in the app folder."
                 )
             
             # Load from file
             self.credentials = service_account.Credentials.from_service_account_file(
                 str(self.credentials_path),
-                scopes=['https://www.googleapis.com/auth/drive']
+                scopes=['https://www.googleapis.com/auth/drive', 'https://www.googleapis.com/auth/spreadsheets']
             )
         else:
             # Use credentials from Streamlit secrets
             self.credentials = service_account.Credentials.from_service_account_info(
                 credentials_info,
-                scopes=['https://www.googleapis.com/auth/drive']
+                scopes=['https://www.googleapis.com/auth/drive', 'https://www.googleapis.com/auth/spreadsheets']
             )
             self.credentials_path = None  # No file path when using secrets
         
         self.service = build('drive', 'v3', credentials=self.credentials)
+        self._sheets_service = build('sheets', 'v4', credentials=self.credentials)
         self._shared_drive_id = None
         self._root_folder_id = None
         self._shared_drive_name = "Data-Analysis-Uploads"
@@ -459,6 +477,60 @@ class GoogleDriveManager:
             'failed_count': len(failed_files),
             'folder_name': subfolder_name
         }
+
+    def create_spreadsheet_from_sheets(self, sheets_data, title="Date Export"):
+        """
+        Create a new Google Spreadsheet and write data to each sheet.
+        
+        Args:
+            sheets_data: Dict mapping sheet name -> list of rows (each row is list of values).
+            title: Title of the spreadsheet.
+        
+        Returns:
+            Dict with 'spreadsheet_id', 'spreadsheet_url', 'error' (if any).
+        """
+        try:
+            sheets_api = self._sheets_service.spreadsheets()
+            body = {
+                'properties': {'title': title},
+                'sheets': [{'properties': {'title': name}} for name in sheets_data.keys()]
+            }
+            create_res = sheets_api.create(body=body).execute()
+            spreadsheet_id = create_res['spreadsheetId']
+            spreadsheet_url = create_res.get('spreadsheetUrl', f"https://docs.google.com/spreadsheets/d/{spreadsheet_id}/edit")
+            
+            for sheet_name, rows in sheets_data.items():
+                if not rows:
+                    continue
+                range_name = f"'{sheet_name}'!A1"
+                # Sheets API expects row count; use a range that covers all data
+                num_rows = len(rows)
+                num_cols = max(len(r) for r in rows) if rows else 0
+                if num_cols == 0:
+                    continue
+                end_col = self._col_letter(num_cols)
+                range_full = f"'{sheet_name}'!A1:{end_col}{num_rows}"
+                sheets_api.values().update(
+                    spreadsheetId=spreadsheet_id,
+                    range=range_full,
+                    valueInputOption='USER_ENTERED',
+                    body={'values': rows}
+                ).execute()
+            
+            return {'spreadsheet_id': spreadsheet_id, 'spreadsheet_url': spreadsheet_url}
+        except HttpError as e:
+            return {'error': str(e)}
+        except Exception as e:
+            return {'error': str(e)}
+
+    @staticmethod
+    def _col_letter(n):
+        """Convert 1-based column index to letter(s), e.g. 1->A, 27->AA."""
+        s = ""
+        while n > 0:
+            n, r = divmod(n - 1, 26)
+            s = chr(65 + r) + s
+        return s or "A"
 
 
 def get_drive_manager():
