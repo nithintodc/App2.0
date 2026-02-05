@@ -650,12 +650,24 @@ def _build_period_pivots(df, platform, store_col, sales_col, payout_col, order_c
     
     if sales_col in df.columns:
         df[sales_col] = pd.to_numeric(df[sales_col], errors='coerce').fillna(0)
-    # DD_24 must use "Net total (for historical reference only)"; DD_25 uses "Net total".
-    # Only fallback for DD_25 when "Net total" is missing (not for DD_24).
+    # DD payout column: prefer requested one; fallback to alternate if missing.
+    # Also try case-insensitive / partial match (some DD exports have slight column name variations).
     effective_payout_col = payout_col
-    if platform == 'DD' and payout_col not in df.columns and payout_col == 'Net total':
-        if 'Net total (for historical reference only)' in df.columns:
-            effective_payout_col = 'Net total (for historical reference only)'
+    if platform == 'DD':
+        if payout_col not in df.columns:
+            alt = 'Net total' if payout_col == 'Net total (for historical reference only)' else 'Net total (for historical reference only)'
+            if alt in df.columns:
+                effective_payout_col = alt
+        if effective_payout_col not in df.columns:
+            # Try partial match for historical column
+            for c in df.columns:
+                c_lower = str(c).lower().strip()
+                if 'historical reference only' in c_lower and 'net total' in c_lower:
+                    effective_payout_col = c
+                    break
+                if c_lower == 'net total' and payout_col == 'Net total':
+                    effective_payout_col = c
+                    break
     if effective_payout_col in df.columns:
         df[effective_payout_col] = pd.to_numeric(df[effective_payout_col], errors='coerce').fillna(0)
     
