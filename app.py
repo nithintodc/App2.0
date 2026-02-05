@@ -710,7 +710,7 @@ def main():
                         operator_name=st.session_state.get("operator_name") or None
                     )
                     if excel_bytes and excel_filename:
-                        st.success(f"✅ **Date Export successful!** Downloading Excel file with 8 sheets...")
+                        st.success(f"✅ **Date Export successful!** Excel file ready for download and uploaded to Google Drive.")
                         st.download_button(
                             label="📥 Download Date Export (Excel)",
                             data=excel_bytes,
@@ -718,6 +718,33 @@ def main():
                             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                             type="primary"
                         )
+                        # Upload to Google Drive (same as Export All Tables)
+                        tmp_path = None
+                        try:
+                            import os
+                            import tempfile
+                            from gdrive_utils import get_drive_manager
+                            with tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx") as tmp:
+                                tmp.write(excel_bytes)
+                                tmp_path = tmp.name
+                            drive_manager = get_drive_manager()
+                            if drive_manager:
+                                upload_result = drive_manager.upload_file_to_subfolder(
+                                    file_path=tmp_path,
+                                    root_folder_name="cloud-app-uploads",
+                                    subfolder_name="date-exports",
+                                    file_name=excel_filename
+                                )
+                                link = upload_result.get('webViewLink') or f"https://drive.google.com/file/d/{upload_result.get('file_id', '')}/view"
+                                st.info(f"📤 File uploaded to Google Drive: [{upload_result['file_name']}]({link})")
+                        except Exception as e:
+                            st.warning(f"⚠️ Google Drive upload failed: {str(e)}")
+                        finally:
+                            if tmp_path and os.path.exists(tmp_path):
+                                try:
+                                    os.unlink(tmp_path)
+                                except Exception:
+                                    pass
                     else:
                         st.error("❌ **Date Export failed!** Please check your data files and date ranges.")
             except Exception as e:

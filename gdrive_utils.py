@@ -79,18 +79,17 @@ class GoogleDriveManager:
             # Load from file
             self.credentials = service_account.Credentials.from_service_account_file(
                 str(self.credentials_path),
-                scopes=['https://www.googleapis.com/auth/drive', 'https://www.googleapis.com/auth/spreadsheets']
+                scopes=['https://www.googleapis.com/auth/drive']
             )
         else:
             # Use credentials from Streamlit secrets
             self.credentials = service_account.Credentials.from_service_account_info(
                 credentials_info,
-                scopes=['https://www.googleapis.com/auth/drive', 'https://www.googleapis.com/auth/spreadsheets']
+                scopes=['https://www.googleapis.com/auth/drive']
             )
             self.credentials_path = None  # No file path when using secrets
         
         self.service = build('drive', 'v3', credentials=self.credentials)
-        self._sheets_service = build('sheets', 'v4', credentials=self.credentials)
         self._shared_drive_id = None
         self._root_folder_id = None
         self._shared_drive_name = "Data-Analysis-Uploads"
@@ -477,60 +476,6 @@ class GoogleDriveManager:
             'failed_count': len(failed_files),
             'folder_name': subfolder_name
         }
-
-    def create_spreadsheet_from_sheets(self, sheets_data, title="Date Export"):
-        """
-        Create a new Google Spreadsheet and write data to each sheet.
-        
-        Args:
-            sheets_data: Dict mapping sheet name -> list of rows (each row is list of values).
-            title: Title of the spreadsheet.
-        
-        Returns:
-            Dict with 'spreadsheet_id', 'spreadsheet_url', 'error' (if any).
-        """
-        try:
-            sheets_api = self._sheets_service.spreadsheets()
-            body = {
-                'properties': {'title': title},
-                'sheets': [{'properties': {'title': name}} for name in sheets_data.keys()]
-            }
-            create_res = sheets_api.create(body=body).execute()
-            spreadsheet_id = create_res['spreadsheetId']
-            spreadsheet_url = create_res.get('spreadsheetUrl', f"https://docs.google.com/spreadsheets/d/{spreadsheet_id}/edit")
-            
-            for sheet_name, rows in sheets_data.items():
-                if not rows:
-                    continue
-                range_name = f"'{sheet_name}'!A1"
-                # Sheets API expects row count; use a range that covers all data
-                num_rows = len(rows)
-                num_cols = max(len(r) for r in rows) if rows else 0
-                if num_cols == 0:
-                    continue
-                end_col = self._col_letter(num_cols)
-                range_full = f"'{sheet_name}'!A1:{end_col}{num_rows}"
-                sheets_api.values().update(
-                    spreadsheetId=spreadsheet_id,
-                    range=range_full,
-                    valueInputOption='USER_ENTERED',
-                    body={'values': rows}
-                ).execute()
-            
-            return {'spreadsheet_id': spreadsheet_id, 'spreadsheet_url': spreadsheet_url}
-        except HttpError as e:
-            return {'error': str(e)}
-        except Exception as e:
-            return {'error': str(e)}
-
-    @staticmethod
-    def _col_letter(n):
-        """Convert 1-based column index to letter(s), e.g. 1->A, 27->AA."""
-        s = ""
-        while n > 0:
-            n, r = divmod(n - 1, 26)
-            s = chr(65 + r) + s
-        return s or "A"
 
 
 def get_drive_manager():
