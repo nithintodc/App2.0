@@ -552,46 +552,46 @@ def create_date_export_from_master_files(dd_data_path, ue_data_path, pre_start_d
         
         GAP_COLUMNS = 4
         
-        # Process DoorDash: Pre and Post on same sheet (Pre left, 4 col gap, Post right)
+        # Process in order: DD_25, UE_25, DD_24, UE_24 (each: Sales, Payouts, Orders)
         if dd_data_path and Path(dd_data_path).exists():
             dd_pre_25 = filter_master_file_by_date_range(Path(dd_data_path), pre_start_date, pre_end_date, DD_DATE_COLUMN_VARIATIONS, excluded_dates)
             dd_post_25 = filter_master_file_by_date_range(Path(dd_data_path), post_start_date, post_end_date, DD_DATE_COLUMN_VARIATIONS, excluded_dates)
             dd_pre_24 = filter_master_file_by_date_range(Path(dd_data_path), pre_24_start, pre_24_end, DD_DATE_COLUMN_VARIATIONS, excluded_dates)
             dd_post_24 = filter_master_file_by_date_range(Path(dd_data_path), post_24_start, post_24_end, DD_DATE_COLUMN_VARIATIONS, excluded_dates)
-            
-            for sheet_label, pre_df, post_df, payout_col_name in [
-                ('DD_25', dd_pre_25, dd_post_25, 'Net total'),
-                ('DD_24', dd_pre_24, dd_post_24, 'Net total (for historical reference only)'),
-            ]:
-                pre_sales, pre_payouts, pre_orders = _build_period_pivots(pre_df, 'DD', 'Merchant store ID', 'Subtotal', payout_col_name, 'DoorDash order ID')
-                post_sales, post_payouts, post_orders = _build_period_pivots(post_df, 'DD', 'Merchant store ID', 'Subtotal', payout_col_name, 'DoorDash order ID')
-                _add_pre_post_sheet(wb, f"{sheet_label}_Sales", pre_sales, post_sales, GAP_COLUMNS)
-                _add_pre_post_sheet(wb, f"{sheet_label}_Payouts", pre_payouts, post_payouts, GAP_COLUMNS)
-                _add_pre_post_sheet(wb, f"{sheet_label}_Orders", pre_orders, post_orders, GAP_COLUMNS)
-        
-        # Process UberEats: Pre and Post on same sheet
+        else:
+            dd_pre_25 = dd_post_25 = dd_pre_24 = dd_post_24 = pd.DataFrame()
         if ue_data_path and Path(ue_data_path).exists():
             ue_pre_25 = filter_master_file_by_date_range(Path(ue_data_path), pre_start_date, pre_end_date, UE_DATE_COLUMN_VARIATIONS, excluded_dates)
             ue_post_25 = filter_master_file_by_date_range(Path(ue_data_path), post_start_date, post_end_date, UE_DATE_COLUMN_VARIATIONS, excluded_dates)
             ue_pre_24 = filter_master_file_by_date_range(Path(ue_data_path), pre_24_start, pre_24_end, UE_DATE_COLUMN_VARIATIONS, excluded_dates)
             ue_post_24 = filter_master_file_by_date_range(Path(ue_data_path), post_24_start, post_24_end, UE_DATE_COLUMN_VARIATIONS, excluded_dates)
-            
-            for sheet_label, pre_df, post_df in [
-                ('UE_25', ue_pre_25, ue_post_25),
-                ('UE_24', ue_pre_24, ue_post_24),
-            ]:
-                # Get store column from first non-empty df
-                ref_df = post_df if pre_df.empty else pre_df
-                if ref_df.empty:
-                    continue
-                ref_norm, store_col = normalize_store_id_column(ref_df.copy())
-                pre_df_norm = normalize_store_id_column(pre_df.copy())[0] if not pre_df.empty else pre_df
-                post_df_norm = normalize_store_id_column(post_df.copy())[0] if not post_df.empty else post_df
-                pre_sales, pre_payouts, pre_orders = _build_period_pivots(pre_df_norm, 'UE', store_col, 'Sales (excl. tax)', 'Total payout', 'Order ID')
-                post_sales, post_payouts, post_orders = _build_period_pivots(post_df_norm, 'UE', store_col, 'Sales (excl. tax)', 'Total payout', 'Order ID')
-                _add_pre_post_sheet(wb, f"{sheet_label}_Sales", pre_sales, post_sales, GAP_COLUMNS)
-                _add_pre_post_sheet(wb, f"{sheet_label}_Payouts", pre_payouts, post_payouts, GAP_COLUMNS)
-                _add_pre_post_sheet(wb, f"{sheet_label}_Orders", pre_orders, post_orders, GAP_COLUMNS)
+        else:
+            ue_pre_25 = ue_post_25 = ue_pre_24 = ue_post_24 = pd.DataFrame()
+        
+        # Sheet order: DD_25, UE_25 (all 25s), then DD_24, UE_24 (all 24s)
+        def add_dd_sheets(sheet_label, pre_df, post_df, payout_col_name):
+            pre_sales, pre_payouts, pre_orders = _build_period_pivots(pre_df, 'DD', 'Merchant store ID', 'Subtotal', payout_col_name, 'DoorDash order ID')
+            post_sales, post_payouts, post_orders = _build_period_pivots(post_df, 'DD', 'Merchant store ID', 'Subtotal', payout_col_name, 'DoorDash order ID')
+            _add_pre_post_sheet(wb, f"{sheet_label}_Sales", pre_sales, post_sales, GAP_COLUMNS)
+            _add_pre_post_sheet(wb, f"{sheet_label}_Payouts", pre_payouts, post_payouts, GAP_COLUMNS)
+            _add_pre_post_sheet(wb, f"{sheet_label}_Orders", pre_orders, post_orders, GAP_COLUMNS)
+        def add_ue_sheets(sheet_label, pre_df, post_df):
+            ref_df = post_df if pre_df.empty else pre_df
+            if ref_df.empty:
+                return
+            ref_norm, store_col = normalize_store_id_column(ref_df.copy())
+            pre_df_norm = normalize_store_id_column(pre_df.copy())[0] if not pre_df.empty else pre_df
+            post_df_norm = normalize_store_id_column(post_df.copy())[0] if not post_df.empty else post_df
+            pre_sales, pre_payouts, pre_orders = _build_period_pivots(pre_df_norm, 'UE', store_col, 'Sales (excl. tax)', 'Total payout', 'Order ID')
+            post_sales, post_payouts, post_orders = _build_period_pivots(post_df_norm, 'UE', store_col, 'Sales (excl. tax)', 'Total payout', 'Order ID')
+            _add_pre_post_sheet(wb, f"{sheet_label}_Sales", pre_sales, post_sales, GAP_COLUMNS)
+            _add_pre_post_sheet(wb, f"{sheet_label}_Payouts", pre_payouts, post_payouts, GAP_COLUMNS)
+            _add_pre_post_sheet(wb, f"{sheet_label}_Orders", pre_orders, post_orders, GAP_COLUMNS)
+        
+        add_dd_sheets('DD_25', dd_pre_25, dd_post_25, 'Net total')
+        add_ue_sheets('UE_25', ue_pre_25, ue_post_25)
+        add_dd_sheets('DD_24', dd_pre_24, dd_post_24, 'Net total (for historical reference only)')
+        add_ue_sheets('UE_24', ue_pre_24, ue_post_24)
         
         # Save to BytesIO
         excel_buffer = io.BytesIO()
@@ -650,11 +650,17 @@ def _build_period_pivots(df, platform, store_col, sales_col, payout_col, order_c
     
     if sales_col in df.columns:
         df[sales_col] = pd.to_numeric(df[sales_col], errors='coerce').fillna(0)
-    if payout_col in df.columns:
-        df[payout_col] = pd.to_numeric(df[payout_col], errors='coerce').fillna(0)
+    # DD_24 must use "Net total (for historical reference only)"; DD_25 uses "Net total".
+    # Only fallback for DD_25 when "Net total" is missing (not for DD_24).
+    effective_payout_col = payout_col
+    if platform == 'DD' and payout_col not in df.columns and payout_col == 'Net total':
+        if 'Net total (for historical reference only)' in df.columns:
+            effective_payout_col = 'Net total (for historical reference only)'
+    if effective_payout_col in df.columns:
+        df[effective_payout_col] = pd.to_numeric(df[effective_payout_col], errors='coerce').fillna(0)
     
     sales_agg = df.groupby([date_col, store_col])[sales_col].sum().reset_index() if sales_col in df.columns else pd.DataFrame()
-    payouts_agg = df.groupby([date_col, store_col])[payout_col].sum().reset_index() if payout_col in df.columns else pd.DataFrame()
+    payouts_agg = df.groupby([date_col, store_col])[effective_payout_col].sum().reset_index() if effective_payout_col in df.columns else pd.DataFrame()
     orders_agg = df.groupby([date_col, store_col])[order_col].nunique().reset_index() if order_col in df.columns else pd.DataFrame()
     
     def _pivot(agg, date_col, store_col, value_col):
@@ -666,7 +672,7 @@ def _build_period_pivots(df, platform, store_col, sales_col, payout_col, order_c
         return p.reset_index()
     
     sales_pivot = _pivot(sales_agg, date_col, store_col, sales_col)
-    payouts_pivot = _pivot(payouts_agg, date_col, store_col, payout_col)
+    payouts_pivot = _pivot(payouts_agg, date_col, store_col, effective_payout_col)
     orders_pivot = _pivot(orders_agg, date_col, store_col, order_col)
     return sales_pivot, payouts_pivot, orders_pivot
 
