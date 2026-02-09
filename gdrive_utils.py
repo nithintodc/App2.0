@@ -3,6 +3,7 @@ Google Drive utility functions for uploading files and managing folders.
 """
 import os
 import json
+import pandas as pd
 from pathlib import Path
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
@@ -79,17 +80,18 @@ class GoogleDriveManager:
             # Load from file
             self.credentials = service_account.Credentials.from_service_account_file(
                 str(self.credentials_path),
-                scopes=['https://www.googleapis.com/auth/drive']
+                scopes=['https://www.googleapis.com/auth/drive', 'https://www.googleapis.com/auth/documents']
             )
         else:
             # Use credentials from Streamlit secrets
             self.credentials = service_account.Credentials.from_service_account_info(
                 credentials_info,
-                scopes=['https://www.googleapis.com/auth/drive']
+                scopes=['https://www.googleapis.com/auth/drive', 'https://www.googleapis.com/auth/documents']
             )
             self.credentials_path = None  # No file path when using secrets
         
         self.service = build('drive', 'v3', credentials=self.credentials)
+        self._docs_service = build('docs', 'v1', credentials=self.credentials)
         self._shared_drive_id = None
         self._root_folder_id = None
         self._shared_drive_name = "Data-Analysis-Uploads"
@@ -476,6 +478,124 @@ class GoogleDriveManager:
             'failed_count': len(failed_files),
             'folder_name': subfolder_name
         }
+
+    def _get_table_cell_indices(self, table_element):
+        """Extract startIndex+1 for each cell (for insertText) in row-major order."""
+        indices = []
+        for row in table_element.get('tableRows', []):
+            for cell in row.get('tableCells', []):
+                for se in cell.get('content', []):
+                    idx = se.get('startIndex')
+                    if idx is not None:
+                        indices.append(idx + 1)
+                        break
+                else:
+                    indices.append(None)
+        return indices
+
+    def create_analysis_doc(self, tables_data, title, root_folder_name="cloud-app-uploads", subfolder_name="outputs"):
+        """
+        Create a Google Doc with native tables (not plain text) and save it to Drive.
+        tables_data: list of (table_name, df) tuples. df can be None/empty.
+        Returns: dict with file_id, webViewLink, file_name or error.
+        """
+        try:
+            root_folder_id = self.get_root_folder(root_folder_name)
+            folder_id = self.get_or_create_folder(subfolder_name, parent_folder_id=root_folder_id)
+            file_metadata = {
+                'name': title,
+                'mimeType': 'application/vnd.google-apps.document',
+                'parents': [folder_id]
+            }
+            doc_file = self.service.files().create(
+                body=file_metadata,
+                supportsAllDrives=True,
+                fields='id, name, webViewLink'
+            ).execute()
+            doc_id = doc_file.get('id')
+            web_view_link = doc_file.get('webViewLink') or f"https://docs.google.com/document/d/{doc_id}/edit"
+
+            # Insert title at start
+            self._docs_service.documents().batchUpdate(
+                documentId=doc_id,
+                body={'requests': [{'insertText': {'location': {'index': 1}, 'text': f"Analysis Export: {title}\n\n"}}]}
+            ).execute()
+
+            def _get_end_index(doc_id):
+                doc = self._docs_service.documents().get(documentId=doc_id).execute()
+                content = doc.get('body', {}).get('content', [])
+                if content:
+                    return content[-1].get('endIndex', 2)
+                return 1
+
+            for table_name, df in tables_data:
+                if df is None or df.empty:
+                    continue
+                idx_name = getattr(df.index, 'name', None)
+                if idx_name in ['Store ID', 'Metric', 'Campaign', 'Is Self Serve Campaign']:
+                    df_display = df.reset_index()
+                else:
+                    df_display = df.copy()
+
+                num_rows = len(df_display) + 1
+                num_cols = len(df_display.columns)
+                if num_rows < 1 or num_cols < 1:
+                    continue
+
+                # Append table title and table at end (insertText requires index; endOfSegmentLocation not valid for location)
+                end_idx = _get_end_index(doc_id)
+                title_text = f"{table_name}\n\n"
+                reqs = [
+                    {'insertText': {'location': {'index': end_idx}, 'text': title_text}},
+                    {'insertTable': {'rows': num_rows, 'columns': num_cols, 'endOfSegmentLocation': {'segmentId': ''}}}
+                ]
+                self._docs_service.documents().batchUpdate(documentId=doc_id, body={'requests': reqs}).execute()
+
+                # Get document to find cell indices
+                doc = self._docs_service.documents().get(documentId=doc_id).execute()
+                body = doc.get('body', {})
+                content = body.get('content', [])
+
+                # Find last table (the one we just inserted)
+                last_table_el = None
+                for el in content:
+                    if 'table' in el:
+                        last_table_el = el
+
+                if last_table_el is None:
+                    continue
+
+                indices = self._get_table_cell_indices(last_table_el.get('table', {}))
+                if not indices:
+                    continue
+
+                # Build (index, text) for each cell; row 0 = header, rest = data
+                cells_to_fill = []
+                cols = list(df_display.columns)
+                for c, col_name in enumerate(cols):
+                    if c < len(indices) and indices[c] is not None:
+                        cells_to_fill.append((indices[c], str(col_name) if col_name else ''))
+                for r, (_, row) in enumerate(df_display.iterrows()):
+                    base = (r + 1) * num_cols
+                    for c, col_name in enumerate(cols):
+                        idx_pos = base + c
+                        if idx_pos < len(indices) and indices[idx_pos] is not None:
+                            val = row[col_name]
+                            cells_to_fill.append((indices[idx_pos], str(val) if pd.notna(val) else ''))
+
+                # Insert in reverse order so indices don't shift
+                cells_to_fill.sort(key=lambda x: -x[0])
+                text_reqs = [{'insertText': {'location': {'index': idx}, 'text': txt}} for idx, txt in cells_to_fill if txt]
+                if text_reqs:
+                    self._docs_service.documents().batchUpdate(documentId=doc_id, body={'requests': text_reqs}).execute()
+
+            return {
+                'file_id': doc_id,
+                'file_name': doc_file.get('name', title),
+                'webViewLink': web_view_link
+            }
+        except Exception as e:
+            return {'error': str(e)}
 
 
 def get_drive_manager():

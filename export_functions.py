@@ -284,11 +284,11 @@ def export_to_excel(dd_table1, dd_table2, ue_table1, ue_table2,
     with open(filepath, 'rb') as f:
         file_bytes = f.read()
     
-    # Upload to Google Drive in "cloud-app-uploads" folder
+    # Upload to Google Drive and create Google Doc with tables
     try:
         drive_manager = get_drive_manager()
         if drive_manager:
-            # Upload to "cloud-app-uploads" folder
+            # Upload Excel to "cloud-app-uploads" folder
             upload_result = drive_manager.upload_file_to_subfolder(
                 file_path=filepath,
                 root_folder_name="cloud-app-uploads",
@@ -297,6 +297,69 @@ def export_to_excel(dd_table1, dd_table2, ue_table1, ue_table2,
             )
             st.success(f"✅ **Export successful!** Excel file ready for download and uploaded to Google Drive.")
             st.info(f"📤 File uploaded to Google Drive: [{upload_result['file_name']}]({upload_result['webViewLink']})")
+            # Build tables for Google Doc (same as Excel)
+            tables_data = [
+                ("Summary Metrics", summary_metrics_table),
+                ("Merchant Store IDs / Markups", store_ids_markups_table),
+                ("Combined Table 1: Current Year Pre vs Post Analysis", combined_summary1),
+                ("Combined Table 2: Year-over-Year Analysis", combined_summary2),
+                ("DoorDash Table 1: Current Year Pre vs Post Analysis", dd_summary1),
+                ("DoorDash Table 2: Year-over-Year Analysis", dd_summary2),
+                ("UberEats Table 1: Current Year Pre vs Post Analysis", ue_summary1),
+                ("UberEats Table 2: Year-over-Year Analysis", ue_summary2),
+                ("Combined Table 1: Current Year Pre vs Post Analysis (Store-Level)", combined_store_table1),
+                ("Combined Table 2: Year-over-Year Analysis (Store-Level)", combined_store_table2),
+                ("DoorDash Table 1: Current Year Pre vs Post Analysis (Store-Level)", dd_table1),
+                ("DoorDash Table 2: Year-over-Year Analysis (Store-Level)", dd_table2),
+                ("UberEats Table 1: Current Year Pre vs Post Analysis (Store-Level)", ue_table1),
+                ("UberEats Table 2: Year-over-Year Analysis (Store-Level)", ue_table2),
+            ]
+            # Add corporate tables (export versions with Campaign relabeled)
+            if corporate_todc_table is not None and not corporate_todc_table.empty:
+                corp_export = corporate_todc_table.copy()
+                corp_export.index.name = 'Campaign'
+                corp_export = corp_export.reset_index()
+                corp_export['Campaign'] = corp_export['Campaign'].apply(
+                    lambda x: 'Corporate' if x == False else ('TODC' if x == True else str(x))
+                )
+                corp_export = corp_export.set_index('Campaign')
+                tables_data.append(("Combined: Corporate vs TODC", corp_export))
+            if promotion_table is not None and not promotion_table.empty:
+                promo_export = promotion_table.copy()
+                promo_export.index.name = 'Campaign'
+                promo_export = promo_export.reset_index()
+                promo_export['Campaign'] = promo_export['Campaign'].apply(
+                    lambda x: 'Corporate' if x == False else ('TODC' if x == True else str(x))
+                )
+                promo_export = promo_export.set_index('Campaign')
+                tables_data.append(("Promotion: Corporate vs TODC", promo_export))
+            if sponsored_table is not None and not sponsored_table.empty:
+                spons_export = sponsored_table.copy()
+                spons_export.index.name = 'Campaign'
+                spons_export = spons_export.reset_index()
+                spons_export['Campaign'] = spons_export['Campaign'].apply(
+                    lambda x: 'Corporate' if x == False else ('TODC' if x == True else str(x))
+                )
+                spons_export = spons_export.set_index('Campaign')
+                tables_data.append(("Sponsored Listing: Corporate vs TODC", spons_export))
+            tables_data.extend([
+                ("Table 1: Sales - Pre vs Post", sales_pre_post_table),
+                ("Table 2: Sales - Year over Year", sales_yoy_table),
+                ("Table 3: Payouts - Pre vs Post", payouts_pre_post_table),
+                ("Table 4: Payouts - Year over Year", payouts_yoy_table),
+            ])
+            # Create Google Doc with all tables
+            doc_title = filename.replace('.xlsx', '') + ' - Tables'
+            doc_result = drive_manager.create_analysis_doc(
+                tables_data=tables_data,
+                title=doc_title,
+                root_folder_name="cloud-app-uploads",
+                subfolder_name="outputs"
+            )
+            if 'error' in doc_result:
+                st.warning(f"⚠️ Google Doc creation failed: {doc_result['error']}")
+            else:
+                st.info(f"📄 Google Doc with all tables: [{doc_result['file_name']}]({doc_result['webViewLink']})")
     except Exception as e:
         st.warning(f"⚠️ Google Drive upload failed: {str(e)}")
     

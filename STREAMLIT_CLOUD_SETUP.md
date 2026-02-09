@@ -94,15 +94,19 @@ client_x509_cert_url = "https://www.googleapis.com/robot/v1/metadata/x509/your-s
 3. **IMPORTANT**: Add `.streamlit/secrets.toml` to `.gitignore` (already done)
 4. For Streamlit Cloud, use the dashboard method (Option A)
 
-### Step 4: Get Your Service Account JSON
+### Step 4: Enable APIs and Get Service Account JSON
 
 1. Go to [Google Cloud Console](https://console.cloud.google.com/)
-2. Navigate to **IAM & Admin** → **Service Accounts**
-3. Click on your service account
-4. Go to **"Keys"** tab
-5. Click **"Add Key"** → **"Create new key"**
-6. Select **JSON** format
-7. Download the JSON file
+2. Enable **Google Drive API** and **Google Docs API**:
+   - Go to **APIs & Services** → **Library**
+   - Search for "Google Drive API" and enable it
+   - Search for "Google Docs API" and enable it
+3. Navigate to **IAM & Admin** → **Service Accounts**
+4. Click on your service account
+5. Go to **"Keys"** tab
+6. Click **"Add Key"** → **"Create new key"**
+7. Select **JSON** format
+8. Download the JSON file
 
 ### Step 5: Convert JSON to TOML Format
 
@@ -160,7 +164,8 @@ client_x509_cert_url = "https://www.googleapis.com/robot/v1/metadata/x509/your-s
    - Upload files
    - Go to Dashboard
    - Click "Export All Tables to Excel"
-   - Check if Google Drive upload works
+   - Check if Excel uploads to Google Drive
+   - Check if Google Doc with all tables is created and link is shown
 
 ## 🔍 Troubleshooting
 
@@ -211,7 +216,8 @@ client_x509_cert_url = "https://www.googleapis.com/robot/v1/metadata/x509/your-s
 - [ ] Secrets added to Streamlit Cloud
 - [ ] Google Drive shared with service account
 - [ ] Export functionality tested
-- [ ] Google Drive upload verified
+- [ ] Google Drive Excel upload verified
+- [ ] Google Doc with tables created and link shown
 
 ## 🎯 Summary
 
