@@ -1,10 +1,12 @@
 """
 Google Drive utility functions for uploading files and managing folders.
+Uses flat folder structure (date/timestamp per folder) to avoid shared drive hierarchy depth limit.
 """
 import os
 import json
 import pandas as pd
 from pathlib import Path
+from datetime import datetime
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
@@ -131,19 +133,39 @@ class GoogleDriveManager:
         
         return self._shared_drive_id
     
-    def get_shared_drive_root_folder_id(self):
+    def get_shared_drive_root_folder_id(self, prefer_shallow=True):
         """
-        Get ANY folder ID within the shared drive to use as parent.
-        For shared drives, we MUST always specify a parent folder that exists in the shared drive.
-        This method finds any existing folder in the shared drive to use as parent reference.
+        Get a folder ID within the shared drive to use as parent.
+        Prefers root-level folders to avoid hierarchy depth limit (teamDriveHierarchyTooDeep).
+        
+        Args:
+            prefer_shallow: If True, try to find root-level folders first (fewer depth levels).
         
         Returns:
             Folder ID within the shared drive that can be used as parent
         """
         shared_drive_id = self.get_shared_drive_id()
         
-        # Query for ANY folder in the shared drive (not just root level)
-        # This ensures we find a folder that definitely exists in the shared drive
+        # Prefer root-level folders (direct children of drive) to minimize hierarchy depth
+        if prefer_shallow:
+            try:
+                root_query = f"'{shared_drive_id}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false"
+                root_results = self.service.files().list(
+                    q=root_query,
+                    fields="files(id, name)",
+                    supportsAllDrives=True,
+                    includeItemsFromAllDrives=True,
+                    corpora='drive',
+                    driveId=shared_drive_id,
+                    pageSize=1
+                ).execute()
+                root_folders = root_results.get('files', [])
+                if root_folders:
+                    return root_folders[0]['id']
+            except HttpError:
+                pass  # Fall through to any-folder query
+        
+        # Fallback: any folder in the shared drive
         query = "mimeType='application/vnd.google-apps.folder' and trashed=false"
         
         try:
@@ -359,29 +381,55 @@ class GoogleDriveManager:
     
     def upload_file_to_subfolder(self, file_path, root_folder_name, subfolder_name, file_name=None):
         """
-        Upload a file to a subfolder within the root folder.
-        Creates subfolder if it doesn't exist.
+        Upload a file using a flat folder structure to avoid shared drive hierarchy depth limit.
+        Creates a single date-stamped folder (e.g., outputs_2026-02-02) instead of nested folders.
+        If folder creation fails (teamDriveHierarchyTooDeep), uploads directly to an existing folder.
         
         Args:
             file_path: Path to the local file to upload
-            root_folder_name: Name of the root folder
-            subfolder_name: Name of the subfolder (e.g., "date-pivots", "outputs")
+            root_folder_name: Name of the root folder (e.g., "cloud-app-uploads")
+            subfolder_name: Name of the subfolder (e.g., "outputs", "date-exports")
             file_name: Optional custom name for the file in Drive
         
         Returns:
             Dictionary with file_id, webViewLink, and folder info
         """
-        # Get or create root folder
-        root_folder_id = self.get_root_folder(root_folder_name)
+        file_path = Path(file_path)
+        if file_name is None:
+            file_name = file_path.name
         
-        # Get or create subfolder
-        subfolder_id = self.get_or_create_folder(subfolder_name, parent_folder_id=root_folder_id)
+        # Use flat folder: single folder per day to minimize hierarchy depth
+        date_str = datetime.now().strftime("%Y-%m-%d")
+        flat_folder_name = f"{subfolder_name}_{date_str}"
         
-        # Upload file
-        result = self.upload_file(file_path, subfolder_id, file_name)
-        result['folder_name'] = subfolder_name
-        
-        return result
+        try:
+            # Get parent - prefer shallow (root-level) folders
+            parent_folder_id = self.get_shared_drive_root_folder_id(prefer_shallow=True)
+            
+            # Create only ONE folder (flat structure)
+            target_folder_id = self.get_or_create_folder(flat_folder_name, parent_folder_id=parent_folder_id)
+            
+            result = self.upload_file(file_path, target_folder_id, file_name)
+            result['folder_name'] = flat_folder_name
+            return result
+            
+        except (HttpError, Exception) as error:
+            err_str = str(error)
+            if hasattr(error, 'content') and error.content:
+                err_str += (error.content.decode('utf-8', errors='ignore') if isinstance(error.content, bytes) else str(error.content))
+            if 'teamDriveHierarchyTooDeep' in err_str or 'hierarchy' in err_str.lower():
+                # Fallback: upload directly to parent folder with unique filename (no new folder)
+                try:
+                    parent_folder_id = self.get_shared_drive_root_folder_id(prefer_shallow=True)
+                    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+                    base, ext = os.path.splitext(file_name)
+                    unique_name = f"{base}_{ts}{ext}" if base else file_name
+                    result = self.upload_file(file_path, parent_folder_id, unique_name)
+                    result['folder_name'] = "(direct upload - hierarchy limit)"
+                    return result
+                except Exception as fallback_err:
+                    raise Exception(f"Hierarchy depth limit. Fallback upload failed: {fallback_err}") from error
+            raise Exception(f"Error creating/getting folder: {error}") from error
     
     def upload_directory(self, directory_path, root_folder_name, subfolder_name="datasets", exclude_dirs=None):
         """
@@ -493,15 +541,29 @@ class GoogleDriveManager:
                     indices.append(None)
         return indices
 
+    def _get_flat_upload_folder(self, subfolder_name):
+        """Get or create a flat date-stamped folder to avoid hierarchy depth limit."""
+        date_str = datetime.now().strftime("%Y-%m-%d")
+        flat_folder_name = f"{subfolder_name}_{date_str}"
+        parent_folder_id = self.get_shared_drive_root_folder_id(prefer_shallow=True)
+        return self.get_or_create_folder(flat_folder_name, parent_folder_id=parent_folder_id)
+
     def create_analysis_doc(self, tables_data, title, root_folder_name="cloud-app-uploads", subfolder_name="outputs"):
         """
         Create a Google Doc with native tables (not plain text) and save it to Drive.
+        Uses flat folder structure (outputs_YYYY-MM-DD) to avoid shared drive hierarchy limit.
         tables_data: list of (table_name, df) tuples. df can be None/empty.
         Returns: dict with file_id, webViewLink, file_name or error.
         """
         try:
-            root_folder_id = self.get_root_folder(root_folder_name)
-            folder_id = self.get_or_create_folder(subfolder_name, parent_folder_id=root_folder_id)
+            try:
+                folder_id = self._get_flat_upload_folder(subfolder_name)
+            except Exception as e:
+                err_str = str(e)
+                if 'teamDriveHierarchyTooDeep' in err_str or 'hierarchy' in err_str.lower():
+                    folder_id = self.get_shared_drive_root_folder_id(prefer_shallow=True)
+                else:
+                    raise
             file_metadata = {
                 'name': title,
                 'mimeType': 'application/vnd.google-apps.document',

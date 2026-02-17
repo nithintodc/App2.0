@@ -276,18 +276,27 @@ def load_and_aggregate_new_customers(excluded_dates=None, pre_start_date=None, p
                     
                     # Filter by date range if provided
                     if start_date and end_date:
-                        # Parse start and end dates
-                        if isinstance(start_date, str):
-                            start_dt = pd.to_datetime(start_date, format='%m/%d/%Y')
-                        else:
-                            start_dt = pd.to_datetime(start_date)
-                        
-                        if isinstance(end_date, str):
-                            end_dt = pd.to_datetime(end_date, format='%m/%d/%Y')
-                        else:
-                            end_dt = pd.to_datetime(end_date)
-                        
-                        date_mask = (df['Date'] >= start_dt) & (df['Date'] <= end_dt)
+                        # Parse start and end dates (support MM/DD/YYYY and YYYY-MM-DD)
+                        def parse_date(d):
+                            if d is None or (isinstance(d, str) and not d.strip()):
+                                return None
+                            if not isinstance(d, str):
+                                return pd.to_datetime(d)
+                            for fmt in ('%m/%d/%Y', '%Y-%m-%d', '%m-%d-%Y'):
+                                try:
+                                    return pd.to_datetime(d, format=fmt)
+                                except (ValueError, TypeError):
+                                    continue
+                            return pd.to_datetime(d, errors='coerce')
+                        start_dt = parse_date(start_date)
+                        end_dt = parse_date(end_date)
+                        if pd.isna(start_dt) or pd.isna(end_dt):
+                            continue
+                        # Compare by calendar date so end_date is fully inclusive (no time truncation)
+                        start_date_only = start_dt.date() if hasattr(start_dt, 'date') else start_dt
+                        end_date_only = end_dt.date() if hasattr(end_dt, 'date') else end_dt
+                        df_dates = df['Date'].dt.date
+                        date_mask = (df_dates >= start_date_only) & (df_dates <= end_date_only)
                         df = df[date_mask]
                     
                     # Apply excluded dates filter

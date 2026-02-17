@@ -283,15 +283,8 @@ def main():
             else:
                 ue_data_path = UE_DATA_MASTER
     
+    # Use only uploaded marketing folder for new customers data
     marketing_folder_path = st.session_state.get("uploaded_marketing_folder")
-    if marketing_folder_path is None:
-        # Check if marketing folder exists in root
-        marketing_candidates = list(ROOT_DIR.glob("marketing*"))
-        if marketing_candidates and marketing_candidates[0].is_dir():
-            marketing_folder_path = marketing_candidates[0]
-            st.info(f"📁 Auto-detected marketing folder: {marketing_folder_path.name}")
-        else:
-            marketing_folder_path = ROOT_DIR
     
     # Load both platforms' data
     with st.spinner("Loading data for both platforms..."):
