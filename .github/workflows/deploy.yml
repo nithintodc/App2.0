@@ -42,20 +42,24 @@ jobs:
             --zone=${{ secrets.GCP_VM_ZONE }} \
             --command="
             # Create backup
-            sudo cp -r /opt/streamlit-app /opt/streamlit-app-backup-\$(date +%Y%m%d-%H%M%S) || true
+            sudo cp -r /opt/streamlit-app /opt/streamlit-app-backup-\$(date +%Y%m%d-%H%M%S) 2>/dev/null || true
             
             # Stop the service
-            sudo systemctl stop streamlit || true
+            sudo systemctl stop streamlit 2>/dev/null || true
             
-            # Copy new files (excluding .github folder from deployment)
+            # Deploy: if repo has app/ subfolder, copy its contents; else copy repo root contents
             sudo rm -rf /opt/streamlit-app/app/*
-            sudo cp -r /tmp/streamlit-app-deploy/* /opt/streamlit-app/app/
+            if [ -d /tmp/streamlit-app-deploy/app ]; then
+              sudo cp -r /tmp/streamlit-app-deploy/app/* /opt/streamlit-app/app/
+            else
+              sudo cp -r /tmp/streamlit-app-deploy/* /opt/streamlit-app/app/
+            fi
             sudo rm -rf /opt/streamlit-app/app/.github
             sudo chown -R ${{ secrets.GCP_VM_USER }}:${{ secrets.GCP_VM_USER }} /opt/streamlit-app/app
             
             # Update Python dependencies
             cd /opt/streamlit-app/app
-            source venv/bin/activate || python3 -m venv venv && source venv/bin/activate
+            source venv/bin/activate 2>/dev/null || ( python3 -m venv venv && source venv/bin/activate )
             pip install --upgrade pip
             pip install -r requirements.txt
             

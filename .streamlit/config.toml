@@ -1,3 +1,8 @@
+[server]
+# Allow large CSV uploads (DoorDash/UberEats financial + marketing). Default is 200MB.
+# If you still get 413, increase further or raise Nginx client_max_body_size (see GCP_VM_DEPLOY_GUIDE).
+maxUploadSize = 600
+
 [theme]
 # Theme will adapt based on user's system preference or can be set to "light" or "dark"
 # For production, you can set base = "light" if you want light mode by default
