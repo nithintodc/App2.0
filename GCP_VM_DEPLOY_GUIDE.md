@@ -137,7 +137,7 @@ gcloud compute scp YOUR_KEY_FILE.json EXTERNAL_IP:/opt/streamlit-app/app/ --zone
 sudo nano /etc/systemd/system/streamlit.service
 ```
 
-Paste this (replace `YOUR_LINUX_USER` with the output of `whoami`):
+Paste this (replace `YOUR_LINUX_USER` with the output of `whoami`). Use your actual app path (e.g. `/opt/streamlit-app/App2.0` if that’s where `app.py` lives). The `--server.maxUploadSize=1024` avoids 413 on large file uploads:
 
 ```ini
 [Unit]
@@ -147,9 +147,9 @@ After=network.target
 [Service]
 Type=simple
 User=YOUR_LINUX_USER
-WorkingDirectory=/opt/streamlit-app/app
-Environment="PATH=/opt/streamlit-app/app/venv/bin"
-ExecStart=/opt/streamlit-app/app/venv/bin/streamlit run app.py --server.port=8501 --server.address=0.0.0.0
+WorkingDirectory=/opt/streamlit-app/App2.0
+Environment="PATH=/opt/streamlit-app/App2.0/venv/bin"
+ExecStart=/opt/streamlit-app/App2.0/venv/bin/streamlit run app.py --server.port=8501 --server.address=0.0.0.0 --server.maxUploadSize=1024
 Restart=always
 RestartSec=10
 
@@ -292,22 +292,28 @@ Then add credentials and fix the service `User=` if needed (script uses current 
 
 ## Troubleshooting: 413 Payload Too Large on File Upload
 
-If uploads fail with **AxiosError: Request failed with status code 413**:
+If uploads fail with **AxiosError: Request failed with status code 413** (Payload Too Large):
 
-1. **Streamlit limit** – The app’s `.streamlit/config.toml` sets `maxUploadSize = 600` (MB). If your repo has an older config, ensure it contains:
-   ```toml
-   [server]
-   maxUploadSize = 600
-   ```
-   Then restart the service: `sudo systemctl restart streamlit`.
+1. **Streamlit server limit** – The server must allow at least 1GB. Do both:
+   - **Config:** In the app directory (e.g. `/opt/streamlit-app/App2.0`), ensure `.streamlit/config.toml` contains:
+     ```toml
+     [server]
+     maxUploadSize = 1024
+     ```
+     (1024 = 1GB in MB.)
+   - **Systemd override:** So the limit applies even if config isn’t loaded, add the flag to `ExecStart` in `/etc/systemd/system/streamlit.service`:
+     ```
+     ... streamlit run app.py --server.port=8501 --server.address=0.0.0.0 --server.maxUploadSize=1024
+     ```
+   Then: `sudo systemctl daemon-reload && sudo systemctl restart streamlit`.
 
-2. **Nginx (if you use it in front of Streamlit)** – Nginx’s default body limit is 1 MB. Increase it:
+2. **Nginx (if you use it in front of Streamlit)** – Nginx’s default body limit is 1 MB, which causes 413. Increase it to 1GB:
    ```bash
    sudo nano /etc/nginx/sites-available/streamlit
    ```
-   Inside the `server { ... }` block add (e.g. 600MB to match Streamlit):
+   Inside the `server { ... }` block add:
    ```nginx
-   client_max_body_size 600M;
+   client_max_body_size 1024M;
    ```
    Then:
    ```bash
@@ -315,7 +321,7 @@ If uploads fail with **AxiosError: Request failed with status code 413**:
    sudo systemctl reload nginx
    ```
 
-3. **Restart Streamlit** after any config change: `sudo systemctl restart streamlit`.
+3. **Restart Streamlit** after any change: `sudo systemctl restart streamlit`.
 
 ---
 
