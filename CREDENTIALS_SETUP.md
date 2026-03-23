@@ -129,13 +129,13 @@ The JSON file should contain:
 
 1. SSH into your VM:
    ```bash
-   gcloud compute ssh streamlit-app --zone=YOUR_ZONE
+   gcloud compute ssh todc-ent-applications --zone=us-west2-a
    ```
 
 2. Upload the file:
    ```bash
    # From your local machine
-   gcloud compute scp todc-marketing-ad02212d4f16.json streamlit-app:/opt/streamlit-app/app/ --zone=YOUR_ZONE
+   gcloud compute scp todc-marketing-ad02212d4f16.json todc-ent-applications:/opt/streamlit-app/app/ --zone=us-west2-a
    ```
 
 ### Option 2: Add to GitHub Secrets (for CI/CD)

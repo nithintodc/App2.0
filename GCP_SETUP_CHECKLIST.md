@@ -6,7 +6,7 @@ Use this checklist to track your progress through the GCP Console setup.
 
 ### Project Setup
 - [ ] Created new GCP project (or selected existing)
-- [ ] Project ID noted: `_________________`
+- [ ] Project ID noted: `_________________` *(fill in your GCP console project)*
 - [ ] Enabled Compute Engine API
 - [ ] Enabled Cloud Build API
 - [ ] Enabled Cloud Storage API (if needed)
@@ -19,15 +19,15 @@ Use this checklist to track your progress through the GCP Console setup.
 - [ ] JSON key saved securely (will be added to GitHub Secrets)
 
 ### VM Instance Setup
-- [ ] Created VM instance: `streamlit-app`
-- [ ] Region selected: `_________________`
-- [ ] Zone selected: `_________________`
-- [ ] Machine type: `_________________`
+- [ ] Created VM instance: **`todc-ent-applications`** *(current server)*
+- [ ] Region selected: **`us-west2`**
+- [ ] Zone selected: **`us-west2-a`**
+- [ ] Machine type: `_________________` *(note from console — e.g. e2-medium)*
 - [ ] Boot disk: Ubuntu 22.04 LTS, 20GB+
 - [ ] HTTP traffic enabled
 - [ ] HTTPS traffic enabled
-- [ ] Network tag added: `streamlit-app`
-- [ ] External IP noted: `_________________`
+- [ ] Network tag added: `streamlit-app` *(required for firewall rule below)*
+- [ ] External IP noted: **`35.236.62.189`** *(ephemeral unless you reserve a static IP)*
 
 ### Firewall Setup
 - [ ] Created firewall rule: `allow-streamlit`
@@ -50,14 +50,14 @@ Use this checklist to track your progress through the GCP Console setup.
 ### GitHub Setup
 - [ ] Added secret: `GCP_PROJECT_ID`
 - [ ] Added secret: `GCP_SA_KEY` (full JSON content)
-- [ ] Added secret: `GCP_VM_ZONE`
-- [ ] Added secret: `GCP_VM_NAME`
-- [ ] Added secret: `GCP_VM_USER`
+- [ ] Added secret: `GCP_VM_ZONE` → **`us-west2-a`**
+- [ ] Added secret: `GCP_VM_NAME` → **`todc-ent-applications`**
+- [ ] Added secret: `GCP_VM_USER` → Linux user on the VM *(run `whoami` over SSH)*
 - [ ] Created `.github/workflows/deploy.yml` file
 - [ ] Pushed code to GitHub
 
 ### Verification
-- [ ] App accessible at `http://EXTERNAL_IP:8501`
+- [ ] App accessible at **`http://35.236.62.189:8501`** *(after Streamlit is running and firewall allows 8501)*
 - [ ] Tested file upload functionality
 - [ ] Tested date range configuration
 - [ ] Tested dashboard display
@@ -69,10 +69,11 @@ Use this checklist to track your progress through the GCP Console setup.
 **GCP Project ID**: `_________________`
 
 **VM Details**:
-- Name: `streamlit-app`
-- Zone: `_________________`
-- External IP: `_________________`
-- Username: `_________________`
+- Name: **`todc-ent-applications`**
+- Zone: **`us-west2-a`**
+- External IP: **`35.236.62.189`**
+- Internal IP: **`10.168.0.3`** *(VPC only — not for browser access)*
+- Username: `_________________` *(from `whoami` on SSH)*
 
 **Service Account Email**: `_________________@_________________.iam.gserviceaccount.com`
 

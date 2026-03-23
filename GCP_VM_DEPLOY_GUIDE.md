@@ -4,6 +4,18 @@ Step-by-step guide to run the Streamlit app on a Google Cloud Platform (GCP) Com
 
 **Quick links:** Checklist → **GCP_SETUP_CHECKLIST.md** | Full deployment details → **DEPLOYMENT_GUIDE.md** | This guide = short path to a working VM.
 
+### Current deployment target (this project)
+
+| Field | Value |
+|--------|--------|
+| **VM name** | `todc-ent-applications` |
+| **Zone** | `us-west2-a` |
+| **External IP** | `35.236.62.189` |
+| **App directory on VM** | `/opt/streamlit-app/app` *(matches `deploy.sh` and GitHub Actions)* |
+| **URL (when Streamlit is up)** | `http://35.236.62.189:8501` |
+
+Replace `YOUR_LINUX_USER` in systemd with the output of `whoami` after you SSH into the VM. With **OS Login**, that name looks like `nithin_theondemandcompany_com` (not `nithin`); use it for `deploy.sh --user` and `GCP_VM_USER`. If `gcloud compute scp` returns **Permission denied (publickey)**, see **Troubleshooting: Permission denied** below and register your SSH key with `gcloud compute os-login ssh-keys add`.
+
 ---
 
 ## What You’ll Have When Done
@@ -88,18 +100,18 @@ pip3 --version
 
 ### 2.3 Create App Directory and Clone Your Code
 
-Replace `YOUR_GITHUB_USER` and `YOUR_REPO` with your actual GitHub repo:
+Use the **browser SSH** button in **Compute Engine → VM instances** if `gcloud ssh` fails on your Mac (different auth path).
+
+Replace `YOUR_GITHUB_USER` and `YOUR_REPO` with your actual GitHub repo. Clone **into** the folder `app` so paths match systemd and CI (`/opt/streamlit-app/app`):
 
 ```bash
 sudo mkdir -p /opt/streamlit-app
 sudo chown $USER:$USER /opt/streamlit-app
 cd /opt/streamlit-app
-
-# Clone the whole repo (you’ll run the app from the app/ subfolder)
-git clone https://github.com/YOUR_GITHUB_USER/YOUR_REPO.git .
+git clone https://github.com/YOUR_GITHUB_USER/YOUR_REPO.git app
 ```
 
-If your repo is private, use a personal access token or SSH key, or upload the code another way (see “Alternative: Upload Code Without Git” below).
+If your repo is private, use a **Personal Access Token** in the URL (`https://TOKEN@github.com/...`) or install an SSH key on the VM and use `git@github.com:ORG/REPO.git`.
 
 ### 2.4 Set Up Python and Install Packages
 
@@ -137,7 +149,7 @@ gcloud compute scp YOUR_KEY_FILE.json EXTERNAL_IP:/opt/streamlit-app/app/ --zone
 sudo nano /etc/systemd/system/streamlit.service
 ```
 
-Paste this (replace `YOUR_LINUX_USER` with the output of `whoami`). Use your actual app path (e.g. `/opt/streamlit-app/App2.0` if that’s where `app.py` lives). The `--server.maxUploadSize=1024` avoids 413 on large file uploads:
+Paste this (replace `YOUR_LINUX_USER` with the output of `whoami`). App files live under **`/opt/streamlit-app/app`** (same as `deploy.sh` and CI). The `--server.maxUploadSize=1024` avoids 413 on large file uploads:
 
 ```ini
 [Unit]
@@ -147,9 +159,9 @@ After=network.target
 [Service]
 Type=simple
 User=YOUR_LINUX_USER
-WorkingDirectory=/opt/streamlit-app/App2.0
-Environment="PATH=/opt/streamlit-app/App2.0/venv/bin"
-ExecStart=/opt/streamlit-app/App2.0/venv/bin/streamlit run app.py --server.port=8501 --server.address=0.0.0.0 --server.maxUploadSize=1024
+WorkingDirectory=/opt/streamlit-app/app
+Environment="PATH=/opt/streamlit-app/app/venv/bin"
+ExecStart=/opt/streamlit-app/app/venv/bin/streamlit run app.py --server.port=8501 --server.address=0.0.0.0 --server.maxUploadSize=1024
 Restart=always
 RestartSec=10
 
@@ -182,6 +194,76 @@ If it doesn’t load:
 
 ---
 
+## Troubleshooting: `Permission denied (publickey)` when running `./deploy.sh` or `gcloud compute scp`
+
+Your project likely has **OS Login** enabled. You may see:
+
+`Using OS Login user [nithin_theondemandcompany_com] instead of requested user [nithin]`
+
+That is normal: the **real SSH username** is the OS Login name (e.g. `nithin_theondemandcompany_com`), not `nithin`. Use it everywhere you set `GCP_VM_USER` or `--user`, and in **GitHub Actions** secrets if you deploy via CI.
+
+**Fix the key rejection (most common):** your `~/.ssh/google_compute_engine` key must be **registered** for OS Login so GCP can install it on the VM.
+
+1. Add your **public** key to OS Login (run on your Mac):
+
+   ```bash
+   gcloud compute os-login ssh-keys add --key-file="$HOME/.ssh/google_compute_engine.pub"
+   ```
+
+   If you use a different key for GCP, point `--key-file` at that `.pub` file.
+
+2. Set the **GCP project** if `gcloud` is not already using it (your CLI suggested `--project=todc-marketing`):
+
+   ```bash
+   gcloud config set project todc-marketing
+   ```
+
+3. Wait **1–2 minutes** for propagation, then test SSH:
+
+   ```bash
+   gcloud compute ssh todc-ent-applications --project=todc-marketing --zone=us-west2-a
+   ```
+
+4. If your key has a **passphrase**, load it into the agent so `scp` can use it non-interactively (optional but helps):
+
+   ```bash
+   ssh-add ~/.ssh/google_compute_engine
+   ```
+
+5. Deploy with the OS Login username:
+
+   ```bash
+   ./deploy.sh --project todc-marketing --user nithin_theondemandcompany_com
+   ```
+
+   Or: `export GCP_VM_USER=nithin_theondemandcompany_com` and `export GCP_PROJECT=todc-marketing` before `./deploy.sh`.
+
+### Still `Permission denied`? Try IAP (Identity-Aware Proxy)
+
+Many organizations **block direct SSH to port 22** on the public IP and only allow SSH **through IAP**. `gcloud` suggests:
+
+`--troubleshoot --tunnel-through-iap`
+
+1. Run the diagnostic (from your Mac):
+
+   ```bash
+   gcloud compute ssh todc-ent-applications --project=todc-marketing --zone=us-west2-a --troubleshoot --tunnel-through-iap
+   ```
+
+2. If that connects, use **`deploy.sh` with IAP** (supported in this repo):
+
+   ```bash
+   ./deploy.sh --iap --project todc-marketing --user nithin_theondemandcompany_com
+   ```
+
+   Or: `export GCP_USE_IAP=1` and `export GCP_PROJECT=todc-marketing`.
+
+3. You need the **IAP-secured Tunnel User** role (`roles/iap.tunnelResourceAccessor`) on the project (or VM), and firewall rules that allow IAP to reach the VM on **TCP 22** (often a rule **from** `35.235.240.0/20` **to** the VM on port 22). Your GCP admin usually sets this.
+
+If SSH still fails after OS Login key + IAP, ask your admin to confirm your account has **Compute OS Login** (or **OS Login External User**) and IAP permissions, and run **`gcloud compute ssh ... --troubleshoot`** and share the report with them.
+
+---
+
 ## Part 4: Optional – Auto-Deploy on Git Push (CI/CD)
 
 So that every push to GitHub updates the app on the VM.
@@ -201,8 +283,8 @@ In your GitHub repo: **Settings** → **Secrets and variables** → **Actions** 
 |-----------------|--------|
 | `GCP_PROJECT_ID` | Your GCP project ID |
 | `GCP_SA_KEY`     | **Entire** contents of the JSON key file |
-| `GCP_VM_ZONE`    | VM zone, e.g. `us-central1-a` |
-| `GCP_VM_NAME`    | VM name, e.g. `streamlit-app` |
+| `GCP_VM_ZONE`    | **`us-west2-a`** |
+| `GCP_VM_NAME`    | **`todc-ent-applications`** |
 | `GCP_VM_USER`    | Linux username on the VM (from `whoami` on SSH) |
 
 ### 4.3 Allow the Service Account to Use the VM
@@ -240,9 +322,8 @@ sudo journalctl -u streamlit -f
 sudo systemctl stop streamlit
 
 # Update code and restart (if not using CI/CD)
-cd /opt/streamlit-app
+cd /opt/streamlit-app/app
 git pull
-cd app
 source venv/bin/activate
 pip install -r requirements.txt
 sudo systemctl restart streamlit
@@ -295,7 +376,7 @@ Then add credentials and fix the service `User=` if needed (script uses current 
 If uploads fail with **AxiosError: Request failed with status code 413** (Payload Too Large):
 
 1. **Streamlit server limit** – The server must allow at least 1GB. Do both:
-   - **Config:** In the app directory (e.g. `/opt/streamlit-app/App2.0`), ensure `.streamlit/config.toml` contains:
+   - **Config:** In the app directory (`/opt/streamlit-app/app`), ensure `.streamlit/config.toml` contains:
      ```toml
      [server]
      maxUploadSize = 1024
@@ -339,7 +420,7 @@ If the app loads but shows a **blank white screen** (and the Network tab shows 2
    ```
    Look for `[TODC]` debug lines: `app/app.py loading`, `app init OK`, `main() entered`. If you see `app init OK` but not `main() entered`, the launcher is not calling `main()`. Also look for `Traceback` or `Error` and fix the reported issue (e.g. missing file, wrong path, import error).
 
-4. **Confirm working directory** – The systemd service `WorkingDirectory` must be the directory that contains `app.py` (e.g. `/opt/streamlit-app/App2.0`). If it points to the wrong folder, imports or config can fail and the app may render nothing.
+4. **Confirm working directory** – The systemd service `WorkingDirectory` must be the directory that contains `app.py` (`/opt/streamlit-app/app`). If it points to the wrong folder, imports or config can fail and the app may render nothing.
 
 5. **Optional debug on screen** – Set `TODC_DEBUG=1` in the environment (e.g. in the systemd service `Environment=TODC_DEBUG=1`) to show a “[Debug] main() running” line in the sidebar when `main()` is executing.
 
