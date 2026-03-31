@@ -86,148 +86,136 @@ def display_store_tables(platform_name, table1_df, table2_df):
         st.warning(f"No {platform_name} stores selected.")
         return
     
-    st.subheader(f"Table 1: Current Year Pre vs Post Analysis")
-    table1_display = table1_df.copy()
-    # Filter out rows with no data (both Pre and Post are 0 or NaN) or empty Store ID
-    if 'Pre' in table1_display.columns and 'Post' in table1_display.columns:
-        table1_display = table1_display[
-            (table1_display['Store ID'].notna() if 'Store ID' in table1_display.columns else True) &
-            (table1_display['Store ID'] != '' if 'Store ID' in table1_display.columns else True) &
-            ((table1_display['Pre'].fillna(0) != 0) | (table1_display['Post'].fillna(0) != 0))
-        ].copy()  # Use .copy() to ensure we have a clean dataframe
-    
-    if not table1_display.empty:
-        # Reset index to ensure clean row numbers before setting Store ID as index
-        if 'Store ID' in table1_display.columns:
-            table1_display = table1_display.reset_index(drop=True)
-        table1_display['Pre'] = table1_display['Pre'].apply(lambda x: f"${x:,.1f}")
-        table1_display['Post'] = table1_display['Post'].apply(lambda x: f"${x:,.1f}")
-        table1_display['PrevsPost'] = table1_display['PrevsPost'].apply(lambda x: f"${x:,.1f}")
-        table1_display['LastYear Pre vs Post'] = table1_display['LastYear Pre vs Post'].apply(lambda x: f"${x:,.1f}")
-        table1_display['Growth%'] = table1_display['Growth%'].apply(lambda x: f"{x:.1f}%")
-        table1_display = table1_display.set_index('Store ID')
-        st.dataframe(table1_display, width='stretch', height=400)
-    else:
-        st.info("No data available for Table 1")
-    
-    # Table 2 (YoY) - Display similar to Summary Analysis
-    if table2_df is not None and not table2_df.empty:
-        st.subheader(f"Table 2: Year-over-Year Analysis")
-        table2_display = table2_df.copy()
+    col_left, col_right = st.columns(2)
+
+    with col_left:
+        st.subheader("Table 1: Current Year Pre vs Post Analysis")
+        table1_display = table1_df.copy()
+        if 'Pre' in table1_display.columns and 'Post' in table1_display.columns:
+            table1_display = table1_display[
+                (table1_display['Store ID'].notna() if 'Store ID' in table1_display.columns else True) &
+                (table1_display['Store ID'] != '' if 'Store ID' in table1_display.columns else True) &
+                ((table1_display['Pre'].fillna(0) != 0) | (table1_display['Post'].fillna(0) != 0))
+            ].copy()
         
-        # Filter out rows with no data (both last year-post and post are 0 or NaN) or empty Store ID
-        if 'last year-post' in table2_display.columns and 'post' in table2_display.columns:
-            table2_display = table2_display[
-                (table2_display['Store ID'].notna() if 'Store ID' in table2_display.columns else True) &
-                (table2_display['Store ID'] != '' if 'Store ID' in table2_display.columns else True) &
-                ((table2_display['last year-post'].fillna(0) != 0) | (table2_display['post'].fillna(0) != 0))
-            ].copy()  # Use .copy() to ensure we have a clean dataframe
-        
-        if not table2_display.empty:
-            # Reset index to ensure clean row numbers before setting Store ID as index
-            if 'Store ID' in table2_display.columns:
-                table2_display = table2_display.reset_index(drop=True)
-            # Format dollar columns
-            if 'last year-post' in table2_display.columns:
-                table2_display['last year-post'] = table2_display['last year-post'].apply(lambda x: f"${x:,.1f}")
-            if 'post' in table2_display.columns:
-                table2_display['post'] = table2_display['post'].apply(lambda x: f"${x:,.1f}")
-            if 'YoY' in table2_display.columns:
-                table2_display['YoY'] = table2_display['YoY'].apply(lambda x: f"${x:,.1f}")
-            # Format percentage column
-            if 'YoY%' in table2_display.columns:
-                table2_display['YoY%'] = table2_display['YoY%'].apply(lambda x: f"{x:.1f}%")
-            
-            if 'Store ID' in table2_display.columns:
-                table2_display = table2_display.set_index('Store ID')
-            st.dataframe(table2_display, width='stretch', height=400)
+        if not table1_display.empty:
+            if 'Store ID' in table1_display.columns:
+                table1_display = table1_display.reset_index(drop=True)
+            table1_display['Pre'] = table1_display['Pre'].apply(lambda x: f"${x:,.1f}")
+            table1_display['Post'] = table1_display['Post'].apply(lambda x: f"${x:,.1f}")
+            table1_display['PrevsPost'] = table1_display['PrevsPost'].apply(lambda x: f"${x:,.1f}")
+            if 'LastYear Pre vs Post' in table1_display.columns:
+                table1_display['LY Pre/Post'] = table1_display['LastYear Pre vs Post'].apply(lambda x: f"${x:,.1f}")
+                table1_display = table1_display.drop(columns=['LastYear Pre vs Post'])
+            table1_display['Growth%'] = table1_display['Growth%'].apply(lambda x: f"{x:.1f}%")
+            table1_display = table1_display.set_index('Store ID')
+            st.dataframe(table1_display, use_container_width=True, height=290)
         else:
-            st.info("No data available for Table 2")
-    else:
-        st.info("No YoY data available for Table 2")
+            st.info("No data available for Table 1")
+
+    with col_right:
+        if table2_df is not None and not table2_df.empty:
+            st.subheader("Table 2: Year-over-Year Analysis")
+            table2_display = table2_df.copy()
+            if 'last year-post' in table2_display.columns and 'post' in table2_display.columns:
+                table2_display = table2_display[
+                    (table2_display['Store ID'].notna() if 'Store ID' in table2_display.columns else True) &
+                    (table2_display['Store ID'] != '' if 'Store ID' in table2_display.columns else True) &
+                    ((table2_display['last year-post'].fillna(0) != 0) | (table2_display['post'].fillna(0) != 0))
+                ].copy()
+            
+            if not table2_display.empty:
+                if 'Store ID' in table2_display.columns:
+                    table2_display = table2_display.reset_index(drop=True)
+                if 'last year-post' in table2_display.columns:
+                    table2_display['LY Post'] = table2_display['last year-post'].apply(lambda x: f"${x:,.1f}")
+                    table2_display = table2_display.drop(columns=['last year-post'])
+                if 'post' in table2_display.columns:
+                    table2_display['Post'] = table2_display['post'].apply(lambda x: f"${x:,.1f}")
+                    table2_display = table2_display.drop(columns=['post'])
+                if 'YoY' in table2_display.columns:
+                    table2_display['YoY'] = table2_display['YoY'].apply(lambda x: f"${x:,.1f}")
+                if 'YoY%' in table2_display.columns:
+                    table2_display['YoY%'] = table2_display['YoY%'].apply(lambda x: f"{x:.1f}%")
+                if 'Store ID' in table2_display.columns:
+                    table2_display = table2_display.set_index('Store ID')
+                st.dataframe(table2_display, use_container_width=True, height=290)
+            else:
+                st.info("No data available for Table 2")
+        else:
+            st.info("No YoY data available for Table 2")
 
 
 def display_summary_tables(platform_name, summary_table1, summary_table2):
     """Display summary tables"""
-    st.write(f"**{platform_name} Table 1: Current Year Pre vs Post Analysis**")
+    col_left, col_right = st.columns(2)
+
     summary_table1_display = summary_table1.copy()
-    # Convert columns to object type to avoid dtype warnings when assigning formatted strings
     for col in summary_table1_display.columns:
         summary_table1_display[col] = summary_table1_display[col].astype(object)
-    
-    # Format columns based on metric type
     for idx in summary_table1_display.index:
         metric = idx
         if metric == 'Orders' or metric == 'New Customers':
-            # Orders: format as integer string
             summary_table1_display.loc[idx, 'Pre'] = f"{int(round(summary_table1.loc[idx, 'Pre'])):,}"
             summary_table1_display.loc[idx, 'Post'] = f"{int(round(summary_table1.loc[idx, 'Post'])):,}"
             summary_table1_display.loc[idx, 'PrevsPost'] = f"{int(round(summary_table1.loc[idx, 'PrevsPost'])):,}"
             summary_table1_display.loc[idx, 'LastYear Pre vs Post'] = f"{int(round(summary_table1.loc[idx, 'LastYear Pre vs Post'])):,}"
         elif metric == 'Profitability':
-            # Profitability: format as percentage
             summary_table1_display.loc[idx, 'Pre'] = f"{summary_table1.loc[idx, 'Pre']:.1f}%"
             summary_table1_display.loc[idx, 'Post'] = f"{summary_table1.loc[idx, 'Post']:.1f}%"
             summary_table1_display.loc[idx, 'PrevsPost'] = f"{summary_table1.loc[idx, 'PrevsPost']:.1f}%"
             summary_table1_display.loc[idx, 'LastYear Pre vs Post'] = f"{summary_table1.loc[idx, 'LastYear Pre vs Post']:.1f}%"
         elif metric == 'Average Check':
-            # Average Check: format as dollars
             summary_table1_display.loc[idx, 'Pre'] = f"${summary_table1.loc[idx, 'Pre']:,.1f}"
             summary_table1_display.loc[idx, 'Post'] = f"${summary_table1.loc[idx, 'Post']:,.1f}"
             summary_table1_display.loc[idx, 'PrevsPost'] = f"${summary_table1.loc[idx, 'PrevsPost']:,.1f}"
             summary_table1_display.loc[idx, 'LastYear Pre vs Post'] = f"${summary_table1.loc[idx, 'LastYear Pre vs Post']:,.1f}"
         else:
-            # Sales/Payouts: format as dollars
             summary_table1_display.loc[idx, 'Pre'] = f"${summary_table1.loc[idx, 'Pre']:,.1f}"
             summary_table1_display.loc[idx, 'Post'] = f"${summary_table1.loc[idx, 'Post']:,.1f}"
             summary_table1_display.loc[idx, 'PrevsPost'] = f"${summary_table1.loc[idx, 'PrevsPost']:,.1f}"
             summary_table1_display.loc[idx, 'LastYear Pre vs Post'] = f"${summary_table1.loc[idx, 'LastYear Pre vs Post']:,.1f}"
-        # Growth% is always a percentage
         summary_table1_display.loc[idx, 'Growth%'] = f"{summary_table1.loc[idx, 'Growth%']:.1f}%"
-    
-    # Ensure all columns are string type for Arrow compatibility
     for col in summary_table1_display.columns:
         summary_table1_display[col] = summary_table1_display[col].astype(str)
-    
-    st.dataframe(summary_table1_display, width='stretch')
-    
-    st.write(f"**{platform_name} Table 2: Year-over-Year Analysis**")
+    if 'LastYear Pre vs Post' in summary_table1_display.columns:
+        summary_table1_display = summary_table1_display.rename(columns={'LastYear Pre vs Post': 'LY Pre/Post'})
+
     summary_table2_display = summary_table2.copy()
-    # Convert columns to object type to avoid dtype warnings when assigning formatted strings
     for col in summary_table2_display.columns:
         summary_table2_display[col] = summary_table2_display[col].astype(object)
-    
-    # Format columns based on metric type
     for idx in summary_table2_display.index:
         metric = idx
         if metric == 'Orders' or metric == 'New Customers':
-            # Orders: format as integer string
             summary_table2_display.loc[idx, 'last year-post'] = f"{int(round(summary_table2.loc[idx, 'last year-post'])):,}"
             summary_table2_display.loc[idx, 'post'] = f"{int(round(summary_table2.loc[idx, 'post'])):,}"
             summary_table2_display.loc[idx, 'YoY'] = f"{int(round(summary_table2.loc[idx, 'YoY'])):,}"
         elif metric == 'Profitability':
-            # Profitability: format as percentage
             summary_table2_display.loc[idx, 'last year-post'] = f"{summary_table2.loc[idx, 'last year-post']:.1f}%"
             summary_table2_display.loc[idx, 'post'] = f"{summary_table2.loc[idx, 'post']:.1f}%"
             summary_table2_display.loc[idx, 'YoY'] = f"{summary_table2.loc[idx, 'YoY']:.1f}%"
         elif metric == 'Average Check':
-            # Average Check: format as dollars
             summary_table2_display.loc[idx, 'last year-post'] = f"${summary_table2.loc[idx, 'last year-post']:,.1f}"
             summary_table2_display.loc[idx, 'post'] = f"${summary_table2.loc[idx, 'post']:,.1f}"
             summary_table2_display.loc[idx, 'YoY'] = f"${summary_table2.loc[idx, 'YoY']:,.1f}"
         else:
-            # Sales/Payouts: format as dollars
             summary_table2_display.loc[idx, 'last year-post'] = f"${summary_table2.loc[idx, 'last year-post']:,.1f}"
             summary_table2_display.loc[idx, 'post'] = f"${summary_table2.loc[idx, 'post']:,.1f}"
             summary_table2_display.loc[idx, 'YoY'] = f"${summary_table2.loc[idx, 'YoY']:,.1f}"
-        # YoY% is always a percentage
         summary_table2_display.loc[idx, 'YoY%'] = f"{summary_table2.loc[idx, 'YoY%']:.1f}%"
-    
-    # Ensure all columns are string type for Arrow compatibility
     for col in summary_table2_display.columns:
         summary_table2_display[col] = summary_table2_display[col].astype(str)
-    
-    st.dataframe(summary_table2_display, width='stretch')
+    if 'last year-post' in summary_table2_display.columns:
+        summary_table2_display = summary_table2_display.rename(columns={'last year-post': 'LY Post'})
+    if 'post' in summary_table2_display.columns:
+        summary_table2_display = summary_table2_display.rename(columns={'post': 'Post'})
+
+    with col_left:
+        st.write(f"**{platform_name} Table 1: Current Year Pre vs Post Analysis**")
+        st.dataframe(summary_table1_display, use_container_width=True)
+    with col_right:
+        st.write(f"**{platform_name} Table 2: Year-over-Year Analysis**")
+        st.dataframe(summary_table2_display, use_container_width=True)
 
 
 def display_platform_data(platform_name, sales_df, payouts_df, sales_label, platform_key):

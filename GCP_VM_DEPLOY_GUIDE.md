@@ -125,6 +125,16 @@ pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
+If `python3 -m venv venv` fails with **ensurepip is not available**, the `python3-venv` package is missing. Install it and retry (use the version that matches `python3 --version`, e.g. `python3.10-venv`):
+
+```bash
+sudo apt-get update
+sudo apt-get install -y python3-venv
+# if needed: sudo apt-get install -y python3.10-venv
+rm -rf venv
+python3 -m venv venv
+```
+
 ### 2.5 (Optional) Add Google Drive Credentials
 
 If the app uses Google Drive:

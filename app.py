@@ -1031,7 +1031,11 @@ def main():
                     sales_pre_post_table=sales_pre_post_table,
                     sales_yoy_table=sales_yoy_table,
                     payouts_pre_post_table=payouts_pre_post_table,
-                    payouts_yoy_table=payouts_yoy_table
+                    payouts_yoy_table=payouts_yoy_table,
+                    ue_sales_pre_post_table=ue_sales_pre_post_table,
+                    ue_sales_yoy_table=ue_sales_yoy_table,
+                    ue_payouts_pre_post_table=ue_payouts_pre_post_table,
+                    ue_payouts_yoy_table=ue_payouts_yoy_table
                 )
                 st.success(f"✅ **Export successful!** Downloading file...")
                 st.download_button(
@@ -1050,70 +1054,65 @@ def main():
     # 1. Combined Store-Level Tables
     st.markdown('<div class="todc-section-header"><span class="todc-badge todc-badge-combined">Combined</span> Store-Level Sales</div>', unsafe_allow_html=True)
     st.caption("Sales values are summed for stores operating on both platforms")
-    if combined_store_table1 is not None and not combined_store_table1.empty:
-        st.subheader("Pre vs Post (Store-Level)")
-        combined_store1_display = combined_store_table1.reset_index() if combined_store_table1.index.name == 'Store ID' else combined_store_table1.copy()
-        # Filter out rows with no data (both Pre and Post are 0 or NaN) or empty Store ID
-        if 'Pre' in combined_store1_display.columns and 'Post' in combined_store1_display.columns:
-            combined_store1_display = combined_store1_display[
-                (combined_store1_display['Store ID'].notna() if 'Store ID' in combined_store1_display.columns else True) &
-                (combined_store1_display['Store ID'] != '' if 'Store ID' in combined_store1_display.columns else True) &
-                ((combined_store1_display['Pre'].fillna(0) != 0) | (combined_store1_display['Post'].fillna(0) != 0))
-            ].copy()  # Use .copy() to ensure we have a clean dataframe
-        # Only display if there's data after filtering
-        if not combined_store1_display.empty and 'Pre' in combined_store1_display.columns:
-            # Reset index to ensure clean row numbers
-            if 'Store ID' in combined_store1_display.columns:
-                combined_store1_display = combined_store1_display.reset_index(drop=True)
-            if 'Pre' in combined_store1_display.columns:
-                combined_store1_display['Pre'] = combined_store1_display['Pre'].apply(lambda x: f"${x:,.1f}" if isinstance(x, (int, float)) else x)
-            if 'Post' in combined_store1_display.columns:
-                combined_store1_display['Post'] = combined_store1_display['Post'].apply(lambda x: f"${x:,.1f}" if isinstance(x, (int, float)) else x)
-            if 'PrevsPost' in combined_store1_display.columns:
-                combined_store1_display['PrevsPost'] = combined_store1_display['PrevsPost'].apply(lambda x: f"${x:,.1f}" if isinstance(x, (int, float)) else x)
-            if 'LastYear Pre vs Post' in combined_store1_display.columns:
-                combined_store1_display['LastYear Pre vs Post'] = combined_store1_display['LastYear Pre vs Post'].apply(lambda x: f"${x:,.1f}" if isinstance(x, (int, float)) else x)
-            if 'Growth%' in combined_store1_display.columns:
-                combined_store1_display['Growth%'] = combined_store1_display['Growth%'].apply(lambda x: f"{x:.1f}%" if isinstance(x, (int, float)) else x)
-            if 'Store ID' in combined_store1_display.columns:
-                combined_store1_display = combined_store1_display.set_index('Store ID')
-            st.dataframe(combined_store1_display, width='stretch', height=400)
-        else:
-            st.info("No data available for Combined Table 1")
-    
-    # Combined Table 2 (YoY) - Store-Level
-    if combined_store_table2 is not None and not combined_store_table2.empty:
-        st.subheader("Year-over-Year (Store-Level)")
-        combined_store2_display = combined_store_table2.reset_index() if combined_store_table2.index.name == 'Store ID' else combined_store_table2.copy()
-        
-        # Filter out rows with no data (both last year-post and post are 0 or NaN) or empty Store ID
-        if 'last year-post' in combined_store2_display.columns and 'post' in combined_store2_display.columns:
-            combined_store2_display = combined_store2_display[
-                (combined_store2_display['Store ID'].notna() if 'Store ID' in combined_store2_display.columns else True) &
-                (combined_store2_display['Store ID'] != '' if 'Store ID' in combined_store2_display.columns else True) &
-                ((combined_store2_display['last year-post'].fillna(0) != 0) | (combined_store2_display['post'].fillna(0) != 0))
-            ].copy()  # Use .copy() to ensure we have a clean dataframe
-        
-        # Only display if there's data after filtering
-        if not combined_store2_display.empty:
-            # Reset index to ensure clean row numbers
-            combined_store2_display = combined_store2_display.reset_index(drop=True) if 'Store ID' in combined_store2_display.columns else combined_store2_display
-            # Format dollar columns
-            if 'last year-post' in combined_store2_display.columns:
-                combined_store2_display['last year-post'] = combined_store2_display['last year-post'].apply(lambda x: f"${x:,.1f}" if isinstance(x, (int, float)) else x)
-            if 'post' in combined_store2_display.columns:
-                combined_store2_display['post'] = combined_store2_display['post'].apply(lambda x: f"${x:,.1f}" if isinstance(x, (int, float)) else x)
-            if 'YoY' in combined_store2_display.columns:
-                combined_store2_display['YoY'] = combined_store2_display['YoY'].apply(lambda x: f"${x:,.1f}" if isinstance(x, (int, float)) else x)
-            # Format percentage column
-            if 'YoY%' in combined_store2_display.columns:
-                combined_store2_display['YoY%'] = combined_store2_display['YoY%'].apply(lambda x: f"{x:.1f}%" if isinstance(x, (int, float)) else x)
-            
-            if 'Store ID' in combined_store2_display.columns:
-                combined_store2_display = combined_store2_display.set_index('Store ID')
-            st.dataframe(combined_store2_display, width='stretch', height=400)
-        else:
-            st.info("No data available for Combined Table 2")
+    left_col, right_col = st.columns(2)
+
+    with left_col:
+        if combined_store_table1 is not None and not combined_store_table1.empty:
+            st.subheader("Pre vs Post (Store-Level)")
+            combined_store1_display = combined_store_table1.reset_index() if combined_store_table1.index.name == 'Store ID' else combined_store_table1.copy()
+            if 'Pre' in combined_store1_display.columns and 'Post' in combined_store1_display.columns:
+                combined_store1_display = combined_store1_display[
+                    (combined_store1_display['Store ID'].notna() if 'Store ID' in combined_store1_display.columns else True) &
+                    (combined_store1_display['Store ID'] != '' if 'Store ID' in combined_store1_display.columns else True) &
+                    ((combined_store1_display['Pre'].fillna(0) != 0) | (combined_store1_display['Post'].fillna(0) != 0))
+                ].copy()
+            if not combined_store1_display.empty and 'Pre' in combined_store1_display.columns:
+                if 'Store ID' in combined_store1_display.columns:
+                    combined_store1_display = combined_store1_display.reset_index(drop=True)
+                if 'Pre' in combined_store1_display.columns:
+                    combined_store1_display['Pre'] = combined_store1_display['Pre'].apply(lambda x: f"${x:,.1f}" if isinstance(x, (int, float)) else x)
+                if 'Post' in combined_store1_display.columns:
+                    combined_store1_display['Post'] = combined_store1_display['Post'].apply(lambda x: f"${x:,.1f}" if isinstance(x, (int, float)) else x)
+                if 'PrevsPost' in combined_store1_display.columns:
+                    combined_store1_display['PrevsPost'] = combined_store1_display['PrevsPost'].apply(lambda x: f"${x:,.1f}" if isinstance(x, (int, float)) else x)
+                if 'LastYear Pre vs Post' in combined_store1_display.columns:
+                    combined_store1_display['LY Pre/Post'] = combined_store1_display['LastYear Pre vs Post'].apply(lambda x: f"${x:,.1f}" if isinstance(x, (int, float)) else x)
+                    combined_store1_display = combined_store1_display.drop(columns=['LastYear Pre vs Post'])
+                if 'Growth%' in combined_store1_display.columns:
+                    combined_store1_display['Growth%'] = combined_store1_display['Growth%'].apply(lambda x: f"{x:.1f}%" if isinstance(x, (int, float)) else x)
+                if 'Store ID' in combined_store1_display.columns:
+                    combined_store1_display = combined_store1_display.set_index('Store ID')
+                st.dataframe(combined_store1_display, use_container_width=True, height=290)
+            else:
+                st.info("No data available for Combined Table 1")
+
+    with right_col:
+        if combined_store_table2 is not None and not combined_store_table2.empty:
+            st.subheader("Year-over-Year (Store-Level)")
+            combined_store2_display = combined_store_table2.reset_index() if combined_store_table2.index.name == 'Store ID' else combined_store_table2.copy()
+            if 'last year-post' in combined_store2_display.columns and 'post' in combined_store2_display.columns:
+                combined_store2_display = combined_store2_display[
+                    (combined_store2_display['Store ID'].notna() if 'Store ID' in combined_store2_display.columns else True) &
+                    (combined_store2_display['Store ID'] != '' if 'Store ID' in combined_store2_display.columns else True) &
+                    ((combined_store2_display['last year-post'].fillna(0) != 0) | (combined_store2_display['post'].fillna(0) != 0))
+                ].copy()
+            if not combined_store2_display.empty:
+                combined_store2_display = combined_store2_display.reset_index(drop=True) if 'Store ID' in combined_store2_display.columns else combined_store2_display
+                if 'last year-post' in combined_store2_display.columns:
+                    combined_store2_display['LY Post'] = combined_store2_display['last year-post'].apply(lambda x: f"${x:,.1f}" if isinstance(x, (int, float)) else x)
+                    combined_store2_display = combined_store2_display.drop(columns=['last year-post'])
+                if 'post' in combined_store2_display.columns:
+                    combined_store2_display['Post'] = combined_store2_display['post'].apply(lambda x: f"${x:,.1f}" if isinstance(x, (int, float)) else x)
+                    combined_store2_display = combined_store2_display.drop(columns=['post'])
+                if 'YoY' in combined_store2_display.columns:
+                    combined_store2_display['YoY'] = combined_store2_display['YoY'].apply(lambda x: f"${x:,.1f}" if isinstance(x, (int, float)) else x)
+                if 'YoY%' in combined_store2_display.columns:
+                    combined_store2_display['YoY%'] = combined_store2_display['YoY%'].apply(lambda x: f"{x:.1f}%" if isinstance(x, (int, float)) else x)
+                if 'Store ID' in combined_store2_display.columns:
+                    combined_store2_display = combined_store2_display.set_index('Store ID')
+                st.dataframe(combined_store2_display, use_container_width=True, height=290)
+            else:
+                st.info("No data available for Combined Table 2")
     
     st.divider()
     
@@ -1171,8 +1170,8 @@ def main():
     for col in combined_summary1_display.columns:
         combined_summary1_display[col] = combined_summary1_display[col].astype(str)
     
-    st.write("**Pre vs Post Analysis**")
-    st.dataframe(combined_summary1_display, width='stretch')
+    if 'LastYear Pre vs Post' in combined_summary1_display.columns:
+        combined_summary1_display = combined_summary1_display.rename(columns={'LastYear Pre vs Post': 'LY Pre/Post'})
     
     # Format Table 2
     combined_summary2_display = combined_summary2.copy()
@@ -1207,8 +1206,18 @@ def main():
     for col in combined_summary2_display.columns:
         combined_summary2_display[col] = combined_summary2_display[col].astype(str)
     
-    st.write("**Year-over-Year Analysis**")
-    st.dataframe(combined_summary2_display, width='stretch')
+    if 'last year-post' in combined_summary2_display.columns:
+        combined_summary2_display = combined_summary2_display.rename(columns={'last year-post': 'LY Post'})
+    if 'post' in combined_summary2_display.columns:
+        combined_summary2_display = combined_summary2_display.rename(columns={'post': 'Post'})
+
+    combined_sum_left, combined_sum_right = st.columns(2)
+    with combined_sum_left:
+        st.write("**Pre vs Post Analysis**")
+        st.dataframe(combined_summary1_display, use_container_width=True)
+    with combined_sum_right:
+        st.write("**Year-over-Year Analysis**")
+        st.dataframe(combined_summary2_display, use_container_width=True)
     
     st.divider()
     
@@ -1247,7 +1256,7 @@ def main():
         )
         corporate_display = corporate_display.set_index('Campaign')
         
-        st.dataframe(corporate_display, width='stretch', height=200)
+        st.dataframe(corporate_display, use_container_width=True)
         
         st.markdown("")
         
@@ -1311,14 +1320,17 @@ def main():
         # --- DoorDash Slots ---
         if dd_has_slots:
             st.markdown('<span class="todc-badge todc-badge-dd">DoorDash</span> Slot Analysis', unsafe_allow_html=True)
-            st.write("**Sales — Pre vs Post**")
-            st.dataframe(_fmt_slot_table(sales_pre_post_table, ['Pre','Post','Pre vs Post']), use_container_width=True, hide_index=True)
-            st.write("**Sales — Year over Year**")
-            st.dataframe(_fmt_slot_table(sales_yoy_table, ['Last year post','Post','YoY']), use_container_width=True, hide_index=True)
-            st.write("**Payouts — Pre vs Post**")
-            st.dataframe(_fmt_slot_table(payouts_pre_post_table, ['Pre','Post','Pre vs Post']), use_container_width=True, hide_index=True)
-            st.write("**Payouts — Year over Year**")
-            st.dataframe(_fmt_slot_table(payouts_yoy_table, ['Last year post','Post','YoY']), use_container_width=True, hide_index=True)
+            dd_slot_left, dd_slot_right = st.columns(2)
+            with dd_slot_left:
+                st.write("**Sales — Pre vs Post**")
+                st.dataframe(_fmt_slot_table(sales_pre_post_table, ['Pre','Post','Pre vs Post']), use_container_width=True, hide_index=True)
+                st.write("**Sales — Year over Year**")
+                st.dataframe(_fmt_slot_table(sales_yoy_table, ['Last year post','Post','YoY']), use_container_width=True, hide_index=True)
+            with dd_slot_right:
+                st.write("**Payouts — Pre vs Post**")
+                st.dataframe(_fmt_slot_table(payouts_pre_post_table, ['Pre','Post','Pre vs Post']), use_container_width=True, hide_index=True)
+                st.write("**Payouts — Year over Year**")
+                st.dataframe(_fmt_slot_table(payouts_yoy_table, ['Last year post','Post','YoY']), use_container_width=True, hide_index=True)
         else:
             st.info("DoorDash financial file not available for slot-based analysis.")
 
@@ -1327,14 +1339,17 @@ def main():
         # --- UberEats Slots ---
         if ue_has_slots:
             st.markdown('<span class="todc-badge todc-badge-ue">UberEats</span> Slot Analysis', unsafe_allow_html=True)
-            st.write("**Sales — Pre vs Post**")
-            st.dataframe(_fmt_slot_table(ue_sales_pre_post_table, ['Pre','Post','Pre vs Post']), use_container_width=True, hide_index=True)
-            st.write("**Sales — Year over Year**")
-            st.dataframe(_fmt_slot_table(ue_sales_yoy_table, ['Last year post','Post','YoY']), use_container_width=True, hide_index=True)
-            st.write("**Payouts — Pre vs Post**")
-            st.dataframe(_fmt_slot_table(ue_payouts_pre_post_table, ['Pre','Post','Pre vs Post']), use_container_width=True, hide_index=True)
-            st.write("**Payouts — Year over Year**")
-            st.dataframe(_fmt_slot_table(ue_payouts_yoy_table, ['Last year post','Post','YoY']), use_container_width=True, hide_index=True)
+            ue_slot_left, ue_slot_right = st.columns(2)
+            with ue_slot_left:
+                st.write("**Sales — Pre vs Post**")
+                st.dataframe(_fmt_slot_table(ue_sales_pre_post_table, ['Pre','Post','Pre vs Post']), use_container_width=True, hide_index=True)
+                st.write("**Sales — Year over Year**")
+                st.dataframe(_fmt_slot_table(ue_sales_yoy_table, ['Last year post','Post','YoY']), use_container_width=True, hide_index=True)
+            with ue_slot_right:
+                st.write("**Payouts — Pre vs Post**")
+                st.dataframe(_fmt_slot_table(ue_payouts_pre_post_table, ['Pre','Post','Pre vs Post']), use_container_width=True, hide_index=True)
+                st.write("**Payouts — Year over Year**")
+                st.dataframe(_fmt_slot_table(ue_payouts_yoy_table, ['Last year post','Post','YoY']), use_container_width=True, hide_index=True)
         else:
             st.info("UberEats file not available for slot-based analysis.")
     else:

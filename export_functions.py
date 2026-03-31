@@ -21,7 +21,8 @@ def export_to_excel(dd_table1, dd_table2, ue_table1, ue_table2,
                      combined_summary1, combined_summary2, combined_store_table1, combined_store_table2,
                      corporate_todc_table=None, promotion_table=None, sponsored_table=None,
                      summary_metrics_table=None, store_ids_markups_table=None, operator_name=None,
-                     sales_pre_post_table=None, sales_yoy_table=None, payouts_pre_post_table=None, payouts_yoy_table=None):
+                     sales_pre_post_table=None, sales_yoy_table=None, payouts_pre_post_table=None, payouts_yoy_table=None,
+                     ue_sales_pre_post_table=None, ue_sales_yoy_table=None, ue_payouts_pre_post_table=None, ue_payouts_yoy_table=None):
     """Export all tables to an Excel file with sheets: Summary Tables, Store-Level Tables, and Corporate vs TODC"""
     # Use temp directory for file creation (will be downloaded, not saved to disk)
     import tempfile
@@ -247,9 +248,9 @@ def export_to_excel(dd_table1, dd_table2, ue_table1, ue_table2,
             sponsored_export = sponsored_export.set_index('Campaign')
             current_row = add_table_to_sheet(ws_corporate, "Sponsored Listing: Corporate vs TODC", sponsored_export, current_row)
     
-    # Add Slot-based Analysis sheet
+    # Add DD slot-wise sheet
     if sales_pre_post_table is not None or sales_yoy_table is not None or payouts_pre_post_table is not None or payouts_yoy_table is not None:
-        ws_slots = wb.create_sheet("Slot-based Analysis")
+        ws_slots = wb.create_sheet("DD-slotWise")
         current_row = 1
         
         # Add Table 1: Sales Pre/Post
@@ -270,6 +271,30 @@ def export_to_excel(dd_table1, dd_table2, ue_table1, ue_table2,
         # Add Table 4: Payouts YoY
         if payouts_yoy_table is not None and not payouts_yoy_table.empty:
             current_row = add_table_to_sheet(ws_slots, "Table 4: Payouts - Year over Year", payouts_yoy_table, current_row)
+    
+    # Add UE slot-wise sheet
+    if ue_sales_pre_post_table is not None or ue_sales_yoy_table is not None or ue_payouts_pre_post_table is not None or ue_payouts_yoy_table is not None:
+        ws_ue_slots = wb.create_sheet("UE-slotWise")
+        current_row = 1
+        
+        # Add Table 1: Sales Pre/Post
+        if ue_sales_pre_post_table is not None and not ue_sales_pre_post_table.empty:
+            current_row = add_table_to_sheet(ws_ue_slots, "Table 1: Sales - Pre vs Post", ue_sales_pre_post_table, current_row)
+            current_row += 2
+        
+        # Add Table 2: Sales YoY
+        if ue_sales_yoy_table is not None and not ue_sales_yoy_table.empty:
+            current_row = add_table_to_sheet(ws_ue_slots, "Table 2: Sales - Year over Year", ue_sales_yoy_table, current_row)
+            current_row += 2
+        
+        # Add Table 3: Payouts Pre/Post
+        if ue_payouts_pre_post_table is not None and not ue_payouts_pre_post_table.empty:
+            current_row = add_table_to_sheet(ws_ue_slots, "Table 3: Payouts - Pre vs Post", ue_payouts_pre_post_table, current_row)
+            current_row += 2
+        
+        # Add Table 4: Payouts YoY
+        if ue_payouts_yoy_table is not None and not ue_payouts_yoy_table.empty:
+            current_row = add_table_to_sheet(ws_ue_slots, "Table 4: Payouts - Year over Year", ue_payouts_yoy_table, current_row)
     
     # ── Insights Sheet ──
     ws_insights = wb.create_sheet("Insights")
@@ -665,8 +690,8 @@ def create_date_export(dd_pre_24_path, dd_post_24_path, dd_pre_25_path, dd_post_
 def create_date_export_from_master_files(dd_data_path, ue_data_path, pre_start_date, pre_end_date, post_start_date, post_end_date, excluded_dates=None, operator_name=None):
     """
     Create date-wise exports of DD and UE financial data.
-    Creates a single Excel file with 8 sheets (one for each period/platform combination).
-    Each sheet contains date-wise data pivoted by Store ID.
+    Creates a single Excel file with 6 sheets (DD + UE x Sales/Payouts/Orders).
+    Each sheet contains side-by-side blocks for 2025 and 2024 (Pre/Post).
     
     Args:
         dd_data_path: Path to DoorDash master file
@@ -691,7 +716,7 @@ def create_date_export_from_master_files(dd_data_path, ue_data_path, pre_start_d
         
         from openpyxl.utils.dataframe import dataframe_to_rows
         
-        GAP_COLUMNS = 4
+        GAP_COLUMNS = 1
         
         # Process in order: DD_25, UE_25, DD_24, UE_24 (each: Sales, Payouts, Orders)
         if dd_data_path and Path(dd_data_path).exists():
@@ -709,30 +734,38 @@ def create_date_export_from_master_files(dd_data_path, ue_data_path, pre_start_d
         else:
             ue_pre_25 = ue_post_25 = ue_pre_24 = ue_post_24 = pd.DataFrame()
         
-        # Sheet order: DD_25, UE_25 (all 25s), then DD_24, UE_24 (all 24s)
-        def add_dd_sheets(sheet_label, pre_df, post_df, payout_col_name):
-            pre_sales, pre_payouts, pre_orders = _build_period_pivots(pre_df, 'DD', 'Merchant store ID', 'Subtotal', payout_col_name, 'DoorDash order ID')
-            post_sales, post_payouts, post_orders = _build_period_pivots(post_df, 'DD', 'Merchant store ID', 'Subtotal', payout_col_name, 'DoorDash order ID')
-            _add_pre_post_sheet(wb, f"{sheet_label}_Sales", pre_sales, post_sales, GAP_COLUMNS)
-            _add_pre_post_sheet(wb, f"{sheet_label}_Payouts", pre_payouts, post_payouts, GAP_COLUMNS)
-            _add_pre_post_sheet(wb, f"{sheet_label}_Orders", pre_orders, post_orders, GAP_COLUMNS)
-        def add_ue_sheets(sheet_label, pre_df, post_df):
-            ref_df = post_df if pre_df.empty else pre_df
+        # Build only DD_25_* and UE_25_* sheets. Place 2024 blocks on those same sheets.
+        def add_dd_sheets(base_sheet_label, pre25_df, post25_df, pre24_df, post24_df):
+            pre25_sales, pre25_payouts, pre25_orders = _build_period_pivots(pre25_df, 'DD', 'Merchant store ID', 'Subtotal', 'Net total', 'DoorDash order ID')
+            post25_sales, post25_payouts, post25_orders = _build_period_pivots(post25_df, 'DD', 'Merchant store ID', 'Subtotal', 'Net total', 'DoorDash order ID')
+            pre24_sales, pre24_payouts, pre24_orders = _build_period_pivots(pre24_df, 'DD', 'Merchant store ID', 'Subtotal', 'Net total (for historical reference only)', 'DoorDash order ID')
+            post24_sales, post24_payouts, post24_orders = _build_period_pivots(post24_df, 'DD', 'Merchant store ID', 'Subtotal', 'Net total (for historical reference only)', 'DoorDash order ID')
+
+            _add_two_year_pre_post_sheet(wb, f"{base_sheet_label}_Sales", pre25_sales, post25_sales, pre24_sales, post24_sales, GAP_COLUMNS)
+            _add_two_year_pre_post_sheet(wb, f"{base_sheet_label}_Payouts", pre25_payouts, post25_payouts, pre24_payouts, post24_payouts, GAP_COLUMNS)
+            _add_two_year_pre_post_sheet(wb, f"{base_sheet_label}_Orders", pre25_orders, post25_orders, pre24_orders, post24_orders, GAP_COLUMNS)
+
+        def add_ue_sheets(base_sheet_label, pre25_df, post25_df, pre24_df, post24_df):
+            ref_df = post25_df if pre25_df.empty else pre25_df
             if ref_df.empty:
                 return
             ref_norm, store_col = normalize_store_id_column(ref_df.copy())
-            pre_df_norm = normalize_store_id_column(pre_df.copy())[0] if not pre_df.empty else pre_df
-            post_df_norm = normalize_store_id_column(post_df.copy())[0] if not post_df.empty else post_df
-            pre_sales, pre_payouts, pre_orders = _build_period_pivots(pre_df_norm, 'UE', store_col, 'Sales (excl. tax)', 'Total payout', 'Order ID')
-            post_sales, post_payouts, post_orders = _build_period_pivots(post_df_norm, 'UE', store_col, 'Sales (excl. tax)', 'Total payout', 'Order ID')
-            _add_pre_post_sheet(wb, f"{sheet_label}_Sales", pre_sales, post_sales, GAP_COLUMNS)
-            _add_pre_post_sheet(wb, f"{sheet_label}_Payouts", pre_payouts, post_payouts, GAP_COLUMNS)
-            _add_pre_post_sheet(wb, f"{sheet_label}_Orders", pre_orders, post_orders, GAP_COLUMNS)
+            pre25_df_norm = normalize_store_id_column(pre25_df.copy())[0] if not pre25_df.empty else pre25_df
+            post25_df_norm = normalize_store_id_column(post25_df.copy())[0] if not post25_df.empty else post25_df
+            pre24_df_norm = normalize_store_id_column(pre24_df.copy())[0] if not pre24_df.empty else pre24_df
+            post24_df_norm = normalize_store_id_column(post24_df.copy())[0] if not post24_df.empty else post24_df
+
+            pre25_sales, pre25_payouts, pre25_orders = _build_period_pivots(pre25_df_norm, 'UE', store_col, 'Sales (excl. tax)', 'Total payout', 'Order ID')
+            post25_sales, post25_payouts, post25_orders = _build_period_pivots(post25_df_norm, 'UE', store_col, 'Sales (excl. tax)', 'Total payout', 'Order ID')
+            pre24_sales, pre24_payouts, pre24_orders = _build_period_pivots(pre24_df_norm, 'UE', store_col, 'Sales (excl. tax)', 'Total payout', 'Order ID')
+            post24_sales, post24_payouts, post24_orders = _build_period_pivots(post24_df_norm, 'UE', store_col, 'Sales (excl. tax)', 'Total payout', 'Order ID')
+
+            _add_two_year_pre_post_sheet(wb, f"{base_sheet_label}_Sales", pre25_sales, post25_sales, pre24_sales, post24_sales, GAP_COLUMNS)
+            _add_two_year_pre_post_sheet(wb, f"{base_sheet_label}_Payouts", pre25_payouts, post25_payouts, pre24_payouts, post24_payouts, GAP_COLUMNS)
+            _add_two_year_pre_post_sheet(wb, f"{base_sheet_label}_Orders", pre25_orders, post25_orders, pre24_orders, post24_orders, GAP_COLUMNS)
         
-        add_dd_sheets('DD_25', dd_pre_25, dd_post_25, 'Net total')
-        add_ue_sheets('UE_25', ue_pre_25, ue_post_25)
-        add_dd_sheets('DD_24', dd_pre_24, dd_post_24, 'Net total (for historical reference only)')
-        add_ue_sheets('UE_24', ue_pre_24, ue_post_24)
+        add_dd_sheets('DD_25', dd_pre_25, dd_post_25, dd_pre_24, dd_post_24)
+        add_ue_sheets('UE_25', ue_pre_25, ue_post_25, ue_pre_24, ue_post_24)
         
         # Save to BytesIO
         excel_buffer = io.BytesIO()
@@ -886,6 +919,46 @@ def _add_pre_post_sheet(wb, sheet_name, pre_pivot, post_pivot, gap_cols=4):
                 if row_idx == 1:
                     cell.alignment = Alignment(horizontal='center', vertical='center')
 
+
+def _add_two_year_pre_post_sheet(wb, sheet_name, pre25_pivot, post25_pivot, pre24_pivot, post24_pivot, gap_cols=4):
+    """
+    Create one sheet with four side-by-side blocks:
+    Pre 25 | Post 25 | Pre 24 | Post 24
+    Each block includes totals and a small header label.
+    """
+    from openpyxl.utils.dataframe import dataframe_to_rows
+
+    blocks = [
+        ("Pre 25", _add_totals_to_pivot(pre25_pivot) if pre25_pivot is not None and not pre25_pivot.empty else None),
+        ("Post 25", _add_totals_to_pivot(post25_pivot) if post25_pivot is not None and not post25_pivot.empty else None),
+        ("Pre 24", _add_totals_to_pivot(pre24_pivot) if pre24_pivot is not None and not pre24_pivot.empty else None),
+        ("Post 24", _add_totals_to_pivot(post24_pivot) if post24_pivot is not None and not post24_pivot.empty else None),
+    ]
+
+    ws = wb.create_sheet(sheet_name)
+    start_col = 1
+    start_row = 2  # Row 1 reserved for block titles
+
+    for block_title, pivot_df in blocks:
+        if pivot_df is None or pivot_df.empty:
+            continue
+
+        ws.cell(row=1, column=start_col, value=block_title).font = Font(bold=True, size=12)
+        ws.cell(row=1, column=start_col).alignment = Alignment(horizontal='left', vertical='center')
+
+        block_rows = 1 + len(pivot_df)
+        block_cols = pivot_df.shape[1]
+
+        for row_idx, row in enumerate(dataframe_to_rows(pivot_df, index=False, header=True), start=start_row):
+            for col_offset, value in enumerate(row):
+                col_idx = start_col + col_offset
+                cell = ws.cell(row=row_idx, column=col_idx, value=value)
+                if row_idx == start_row or row_idx == (start_row + block_rows - 1):
+                    cell.font = Font(bold=True)
+                if row_idx == start_row:
+                    cell.alignment = Alignment(horizontal='center', vertical='center')
+
+        start_col += block_cols + gap_cols
 
 def _add_period_sheets_to_workbook(wb, df, platform, period_name, store_col, sales_col, payout_col, order_col):
     """
