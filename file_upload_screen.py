@@ -6,6 +6,65 @@ import re
 from pathlib import Path
 from datetime import datetime, timedelta
 
+_CHUNK_BYTES = 2 * 1024 * 1024  # 2 MiB per read while saving to disk
+
+
+def _uploaded_file_size(uploaded_file) -> int:
+    n = getattr(uploaded_file, "size", None)
+    if n is not None:
+        return int(n)
+    return len(uploaded_file.getbuffer())
+
+
+def _write_upload_with_progress(uploaded_file, dest_path: Path, label: str) -> None:
+    """Save an UploadedFile to disk with a progress bar (server-side save; shows % of bytes written)."""
+    uploaded_file.seek(0)
+    total = max(_uploaded_file_size(uploaded_file), 1)
+    progress_bar = st.progress(0)
+    status = st.empty()
+    written = 0
+    with open(dest_path, "wb") as out:
+        while True:
+            chunk = uploaded_file.read(_CHUNK_BYTES)
+            if not chunk:
+                break
+            out.write(chunk)
+            written += len(chunk)
+            pct = min(written / total, 1.0)
+            progress_bar.progress(pct)
+            mb_done = written / (1024 * 1024)
+            mb_total = total / (1024 * 1024)
+            status.markdown(f"{label}: **{pct * 100:.0f}%** ({mb_done:.1f} / {mb_total:.1f} MB)")
+    progress_bar.empty()
+    status.empty()
+
+
+def _write_many_uploads_with_progress(pairs: list, overall_label: str) -> None:
+    """pairs: list of (UploadedFile, Path). Single progress bar over all files."""
+    if not pairs:
+        return
+    total = sum(_uploaded_file_size(uf) for uf, _ in pairs)
+    total = max(total, 1)
+    progress_bar = st.progress(0)
+    status = st.empty()
+    written = 0
+    for uploaded_file, dest_path in pairs:
+        uploaded_file.seek(0)
+        with open(dest_path, "wb") as out:
+            while True:
+                chunk = uploaded_file.read(_CHUNK_BYTES)
+                if not chunk:
+                    break
+                out.write(chunk)
+                written += len(chunk)
+                pct = min(written / total, 1.0)
+                progress_bar.progress(pct)
+                mb_done = written / (1024 * 1024)
+                mb_total = total / (1024 * 1024)
+                status.markdown(f"{overall_label}: **{pct * 100:.0f}%** ({mb_done:.1f} / {mb_total:.1f} MB)")
+    progress_bar.empty()
+    status.empty()
+
 
 def calculate_days_in_range(start_date, end_date):
     """Calculate number of days in a date range (inclusive)"""
@@ -353,6 +412,10 @@ def display_file_upload_screen():
     st.markdown('<div class="section-header"><span class="step-number">2</span> Upload Data Files</div>', unsafe_allow_html=True)
 
     st.caption("Upload the financial CSVs exported from DoorDash and UberEats, plus any marketing files.")
+    st.caption(
+        "Large files: your browser shows a spinner while the file is sent to the server; "
+        "after the transfer completes, a progress bar appears while the app saves the file to disk."
+    )
     
     # 1 row, 3 boxes: DD | UE | Marketing
     col_dd, col_ue, col_mkt = st.columns(3)
@@ -370,8 +433,7 @@ def display_file_upload_screen():
             if st.session_state.temp_upload_dir is None:
                 st.session_state.temp_upload_dir = Path(tempfile.mkdtemp())
             dd_path = st.session_state.temp_upload_dir / "dd-data.csv"
-            with open(dd_path, 'wb') as f:
-                f.write(dd_file.getbuffer())
+            _write_upload_with_progress(dd_file, dd_path, "Saving DoorDash file")
             st.session_state.uploaded_dd_data = dd_path
             info = extract_file_info(dd_path, 'dd')
             st.markdown(f"""<div class="success-box">✅ {dd_file.name}</div>""", unsafe_allow_html=True)
@@ -394,8 +456,7 @@ def display_file_upload_screen():
             if st.session_state.temp_upload_dir is None:
                 st.session_state.temp_upload_dir = Path(tempfile.mkdtemp())
             ue_path = st.session_state.temp_upload_dir / "ue-data.csv"
-            with open(ue_path, 'wb') as f:
-                f.write(ue_file.getbuffer())
+            _write_upload_with_progress(ue_file, ue_path, "Saving UberEats file")
             st.session_state.uploaded_ue_data = ue_path
             info = extract_file_info(ue_path, 'ue')
             st.markdown(f"""<div class="success-box">✅ {ue_file.name}</div>""", unsafe_allow_html=True)
@@ -474,17 +535,16 @@ def display_file_upload_screen():
                 file_groups[folder_name] = []
             file_groups[folder_name].append(uploaded_file)
         
-        # Create folders and save files
+        # Create folders and save files (progress across all marketing files)
         marketing_folders_created = set()
+        marketing_pairs = []
         for folder_name, files in file_groups.items():
             folder_path = marketing_dir / folder_name
             folder_path.mkdir(exist_ok=True)
             marketing_folders_created.add(folder_name)
-            
             for uploaded_file in files:
-                file_path = folder_path / uploaded_file.name
-                with open(file_path, 'wb') as f:
-                    f.write(uploaded_file.getbuffer())
+                marketing_pairs.append((uploaded_file, folder_path / uploaded_file.name))
+        _write_many_uploads_with_progress(marketing_pairs, "Saving marketing files")
         
         st.session_state.uploaded_marketing_folder = marketing_dir
         

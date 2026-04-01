@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import os
+import inspect
 from pathlib import Path
 from datetime import datetime
 from openpyxl import Workbook
@@ -1015,13 +1016,9 @@ def main():
             with st.spinner("🔄 Exporting all tables to Excel..."):
                 pre_date_range_str = f"{pre_start_date} - {pre_end_date}" if pre_start_date and pre_end_date else ""
                 post_date_range_str = f"{post_start_date} - {post_end_date}" if post_start_date and post_end_date else ""
-                file_bytes, filename = export_to_excel(
-                    dd_table1, dd_table2, ue_table1, ue_table2,
-                    dd_sales_df, dd_payouts_df, dd_orders_df, dd_new_customers_df,
-                    ue_sales_df, ue_payouts_df, ue_orders_df, ue_new_customers_df,
-                    st.session_state.get("selected_stores_DoorDash", []),
-                    st.session_state.get("selected_stores_UberEats", []),
-                    combined_summary1, combined_summary2, combined_store_table1, combined_store_table2,
+                # Only pass keyword args the installed export_to_excel accepts (avoids crashes if
+                # production deploys app.py ahead of export_functions.py with new UE slot parameters).
+                _export_kw = dict(
                     corporate_todc_table=corporate_todc_table,
                     promotion_table=promotion_table,
                     sponsored_table=sponsored_table,
@@ -1035,7 +1032,18 @@ def main():
                     ue_sales_pre_post_table=ue_sales_pre_post_table,
                     ue_sales_yoy_table=ue_sales_yoy_table,
                     ue_payouts_pre_post_table=ue_payouts_pre_post_table,
-                    ue_payouts_yoy_table=ue_payouts_yoy_table
+                    ue_payouts_yoy_table=ue_payouts_yoy_table,
+                )
+                _sig = inspect.signature(export_to_excel)
+                _export_kw = {k: v for k, v in _export_kw.items() if k in _sig.parameters}
+                file_bytes, filename = export_to_excel(
+                    dd_table1, dd_table2, ue_table1, ue_table2,
+                    dd_sales_df, dd_payouts_df, dd_orders_df, dd_new_customers_df,
+                    ue_sales_df, ue_payouts_df, ue_orders_df, ue_new_customers_df,
+                    st.session_state.get("selected_stores_DoorDash", []),
+                    st.session_state.get("selected_stores_UberEats", []),
+                    combined_summary1, combined_summary2, combined_store_table1, combined_store_table2,
+                    **_export_kw,
                 )
                 st.success(f"✅ **Export successful!** Downloading file...")
                 st.download_button(
