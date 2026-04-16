@@ -15,7 +15,7 @@ from data_processing import load_and_aggregate_ue_data, load_and_aggregate_dd_da
 from marketing_analysis import create_corporate_vs_todc_table
 from table_generation import create_summary_tables, create_combined_summary_tables, create_combined_store_tables, get_platform_store_tables, get_platform_summary_tables
 from ui_components import create_store_selector, display_store_tables, display_summary_tables, display_platform_data
-from export_functions import export_to_excel, create_date_export, create_date_export_from_master_files
+from export_functions import export_to_excel, create_date_export, create_date_export_from_master_files, create_bucketing_export, build_financial_summary_table
 from file_upload_screen import display_file_upload_screen
 
 # Set page config (must be first Streamlit command)
@@ -532,6 +532,7 @@ def main():
     marketing_folder_path = st.session_state.get("uploaded_marketing_folder")
     
     # Load both platforms' data
+    financial_summary_df = pd.DataFrame()
     with st.spinner("Loading data for both platforms..."):
         # Load UberEats data (using master file if date ranges provided)
         (ue_pre_24_sales, ue_pre_24_payouts, ue_pre_24_orders, ue_post_24_sales, ue_post_24_payouts, ue_post_24_orders,
@@ -579,6 +580,13 @@ def main():
             'pre_25': ue_pre_25_total,
             'post_25': ue_post_25_total
         }
+        
+        # Build financial summary table from raw CSV data
+        financial_summary_df = build_financial_summary_table(
+            dd_data_path, ue_data_path,
+            pre_start, pre_end, post_start, post_end,
+            excluded_dates
+        )
     
     # Initialize store selection with all stores by default (before sidebar)
     if not dd_sales_df.empty:
@@ -805,6 +813,38 @@ def main():
     )
     combined_store_table1, combined_store_table2 = create_combined_store_tables(dd_table1, dd_table2, ue_table1, ue_table2)
     
+    # ── Financial Summary Table (displayed at top of dashboard) ──
+    if financial_summary_df is not None and not financial_summary_df.empty:
+        st.markdown('<div class="todc-section-header">Financial Summary</div>', unsafe_allow_html=True)
+        st.caption("DD + UE combined financial metrics  ·  Pre vs Post & Year-over-Year with growth rates")
+        fin_display = financial_summary_df.copy()
+        for col in fin_display.columns:
+            fin_display[col] = fin_display[col].astype(object)
+        pct_display_cols = {'Linear Growth%', 'LY Linear %', 'YoY%'}
+        value_display_cols = {
+            'Pre', 'Post', 'Pre vs Post',
+            'Last Year Pre', 'Last Year Post', 'LY Pre vs Post', 'YoY',
+        }
+        for idx in fin_display.index:
+            metric = str(fin_display.loc[idx, 'Metric'])
+            is_pct = 'Profitability%' in metric
+            for col in value_display_cols:
+                if col in fin_display.columns:
+                    val = financial_summary_df.loc[idx, col]
+                    if is_pct:
+                        fin_display.loc[idx, col] = f"{val:.1f}%"
+                    else:
+                        fin_display.loc[idx, col] = f"${val:,.2f}"
+            for col in pct_display_cols:
+                if col in fin_display.columns:
+                    val = financial_summary_df.loc[idx, col]
+                    fin_display.loc[idx, col] = f"{val:.1f}%"
+        for col in fin_display.columns:
+            fin_display[col] = fin_display[col].astype(str)
+        fin_display = fin_display.set_index('Metric')
+        st.dataframe(fin_display, use_container_width=True, height=580)
+        st.divider()
+
     # Top summary table (at top of dashboard)
     linear_growth = combined_summary1.loc['Sales', 'Growth%'] if combined_summary1 is not None and not combined_summary1.empty and 'Sales' in combined_summary1.index and 'Growth%' in combined_summary1.columns else 0
     yoy_growth = combined_summary2.loc['Sales', 'YoY%'] if combined_summary2 is not None and not combined_summary2.empty and 'Sales' in combined_summary2.index and 'YoY%' in combined_summary2.columns else 0
@@ -892,7 +932,7 @@ def main():
     
     st.divider()
     
-    col1, col2, col3, col4 = st.columns([1, 1, 1, 1])
+    col1, col2, col3, col4, col5 = st.columns([1, 1, 1, 1, 1])
     with col1:
         dd_total = len(dd_sales_df['Store ID'].unique()) if not dd_sales_df.empty else 0
         dd_selected = len(st.session_state.get("selected_stores_DoorDash", []))
@@ -905,6 +945,8 @@ def main():
         export_clicked = st.button("Export Full Report", type="primary", key="export_excel", use_container_width=True)
     with col4:
         date_export_clicked = st.button("Export by Date", type="primary", key="export_date", use_container_width=True)
+    with col5:
+        bucketing_export_clicked = st.button("Bucketing Export", type="primary", key="export_bucketing", use_container_width=True)
     st.divider()
     
     # Get Corporate vs TODC tables
@@ -944,12 +986,10 @@ def main():
                             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                             type="primary"
                         )
-                        # Upload to Google Drive (same as Export All Tables)
+                        # Upload to Google Drive
                         tmp_path = None
                         try:
-                            import os
                             import tempfile
-                            from gdrive_utils import get_drive_manager
                             with tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx") as tmp:
                                 tmp.write(excel_bytes)
                                 tmp_path = tmp.name
@@ -979,6 +1019,63 @@ def main():
                 with st.expander("🔍 View Error Details"):
                     st.code(traceback.format_exc())
     
+    # Bucketing Export functionality
+    if bucketing_export_clicked:
+        if not dd_data_path or not Path(dd_data_path).exists():
+            st.error("❌ **DoorDash financial file required!** Please upload a DD financial CSV on the Upload screen.")
+        else:
+            try:
+                with st.spinner("🔄 Running bucketing analysis..."):
+                    excel_bytes, excel_filename = create_bucketing_export(
+                        dd_data_path=dd_data_path,
+                        operator_name=st.session_state.get("operator_name") or None,
+                        pre_start_date=pre_start,
+                        pre_end_date=pre_end,
+                        post_start_date=post_start,
+                        post_end_date=post_end,
+                        excluded_dates=excluded_dates
+                    )
+                    if excel_bytes and excel_filename:
+                        st.success(f"✅ **Bucketing Export successful!** Excel file ready for download.")
+                        st.download_button(
+                            label="📥 Download Bucketing Export (Excel)",
+                            data=excel_bytes,
+                            file_name=excel_filename,
+                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                            type="primary"
+                        )
+                        import tempfile
+                        tmp_path = None
+                        try:
+                            with tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx") as tmp:
+                                tmp.write(excel_bytes)
+                                tmp_path = tmp.name
+                            drive_manager = get_drive_manager()
+                            if drive_manager:
+                                upload_result = drive_manager.upload_file_to_subfolder(
+                                    file_path=tmp_path,
+                                    root_folder_name="cloud-app-uploads",
+                                    subfolder_name="bucketing-exports",
+                                    file_name=excel_filename
+                                )
+                                link = upload_result.get('webViewLink') or f"https://drive.google.com/file/d/{upload_result.get('file_id', '')}/view"
+                                st.info(f"📤 File uploaded to Google Drive: [{upload_result['file_name']}]({link})")
+                        except Exception as e:
+                            st.warning(f"⚠️ Google Drive upload failed: {str(e)}")
+                        finally:
+                            if tmp_path:
+                                try:
+                                    os.unlink(tmp_path)
+                                except Exception:
+                                    pass
+                    else:
+                        st.error("❌ **Bucketing Export failed!** Check your DD financial file.")
+            except Exception as e:
+                st.error(f"❌ **Bucketing Export failed!** Error: {str(e)}")
+                import traceback
+                with st.expander("🔍 View Error Details"):
+                    st.code(traceback.format_exc())
+
     # Initialize slot table variables (needed for export)
     sales_pre_post_table = None
     sales_yoy_table = None
@@ -1035,7 +1132,15 @@ def main():
                     ue_sales_pre_post_table=ue_sales_pre_post_table,
                     ue_sales_yoy_table=ue_sales_yoy_table,
                     ue_payouts_pre_post_table=ue_payouts_pre_post_table,
-                    ue_payouts_yoy_table=ue_payouts_yoy_table
+                    ue_payouts_yoy_table=ue_payouts_yoy_table,
+                    dd_data_path=dd_data_path,
+                    ue_data_path=ue_data_path,
+                    pre_start_date=pre_start,
+                    pre_end_date=pre_end,
+                    post_start_date=post_start,
+                    post_end_date=post_end,
+                    excluded_dates=excluded_dates,
+                    financial_summary_table=financial_summary_df
                 )
                 st.success(f"✅ **Export successful!** Downloading file...")
                 st.download_button(
