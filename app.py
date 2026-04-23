@@ -17,6 +17,7 @@ from table_generation import create_summary_tables, create_combined_summary_tabl
 from ui_components import create_store_selector, display_store_tables, display_summary_tables, display_platform_data
 from export_functions import export_to_excel, create_date_export, create_date_export_from_master_files, create_bucketing_export, build_financial_summary_table
 from file_upload_screen import display_file_upload_screen
+from new_analysis_screen import display_new_analysis_screen
 
 # Set page config (must be first Streamlit command)
 st.set_page_config(
@@ -431,7 +432,31 @@ def _generate_insights(dd_sales_df, ue_sales_df, dd_payouts_df, ue_payouts_df,
         st.warning("Could not generate insights: {}".format(e))
 
 
+NEW_PAGE = None
+HOME_PAGE = None
+
+
+def _build_navigation_query_params():
+    """Persist core analysis state across internal page navigation."""
+    params = {}
+    for key in ["pre_start_date", "pre_end_date", "post_start_date", "post_end_date", "operator_name"]:
+        value = st.session_state.get(key)
+        if value:
+            params[key] = str(value)
+    return params
+
+
 def main():
+    st.markdown(
+        """
+        <script>
+        if (window.location.hash === '#new' && !window.location.pathname.endsWith('/new')) {
+            window.location.replace(window.location.origin + '/new' + window.location.search);
+        }
+        </script>
+        """,
+        unsafe_allow_html=True,
+    )
     # Screen navigation
     current_screen = st.session_state.get("current_screen", "upload")
 
@@ -467,12 +492,15 @@ def main():
                     st.rerun()
                 else:
                     st.warning("Set date ranges first, then click 'Run Analysis'")
+
+        if st.button("New", key="nav_new_page", type="primary", use_container_width=True):
+            st.switch_page(NEW_PAGE, query_params=_build_navigation_query_params())
     
     # Display appropriate screen
     if current_screen == "upload":
         display_file_upload_screen()
         return
-    
+
     # Dashboard screen
     st.markdown('<h1 style="margin-bottom:0.1rem;">Performance Dashboard</h1>', unsafe_allow_html=True)
     st.caption("DoorDash + UberEats combined analytics  ·  Pre vs Post & Year-over-Year")
@@ -703,6 +731,12 @@ def main():
                             valid = False
                     
                     if valid and (pre_range or post_range):
+                        st.query_params["pre_start_date"] = st.session_state.get("pre_start_date", "")
+                        st.query_params["pre_end_date"] = st.session_state.get("pre_end_date", "")
+                        st.query_params["post_start_date"] = st.session_state.get("post_start_date", "")
+                        st.query_params["post_end_date"] = st.session_state.get("post_end_date", "")
+                        if st.session_state.get("operator_name"):
+                            st.query_params["operator_name"] = st.session_state.get("operator_name", "")
                         st.success("Date ranges applied! Reloading data...")
                         st.rerun()
                     elif not pre_range and not post_range:
@@ -716,6 +750,9 @@ def main():
                     st.session_state["pre_end_date"] = ""
                     st.session_state["post_start_date"] = ""
                     st.session_state["post_end_date"] = ""
+                    for key in ["pre_start_date", "pre_end_date", "post_start_date", "post_end_date", "operator_name"]:
+                        if key in st.query_params:
+                            del st.query_params[key]
                     st.rerun()
             
             # Show current date ranges
@@ -932,7 +969,7 @@ def main():
     
     st.divider()
     
-    col1, col2, col3, col4, col5 = st.columns([1, 1, 1, 1, 1])
+    col1, col2, col3, col4, col5, col6 = st.columns([1, 1, 1, 1, 1, 1])
     with col1:
         dd_total = len(dd_sales_df['Store ID'].unique()) if not dd_sales_df.empty else 0
         dd_selected = len(st.session_state.get("selected_stores_DoorDash", []))
@@ -947,6 +984,9 @@ def main():
         date_export_clicked = st.button("Export by Date", type="primary", key="export_date", use_container_width=True)
     with col5:
         bucketing_export_clicked = st.button("Bucketing Export", type="primary", key="export_bucketing", use_container_width=True)
+    with col6:
+        if st.button("Open New View", type="primary", key="open_new_view", use_container_width=True):
+            st.switch_page(NEW_PAGE, query_params=_build_navigation_query_params())
     st.divider()
     
     # Get Corporate vs TODC tables
@@ -1460,10 +1500,25 @@ def main():
     else:
         st.info("No financial files available for slot-based analysis.")
 
+def _render_home_page():
+    """Router page for the existing app."""
+    main()
+
+
+def _render_new_page():
+    """Router page for the new deep-dive view."""
+    display_new_analysis_screen()
+
+
 if _init_ok:
     try:
+        HOME_PAGE = st.Page(_render_home_page, title="TODC Analytics", icon="📊", default=True)
+        NEW_PAGE = st.Page(_render_new_page, title="New", icon="🧭", url_path="new")
+        st.navigation([HOME_PAGE, NEW_PAGE], position="hidden").run()
+    except AttributeError:
+        # Older Streamlit versions won't support multipage routing.
+        # In that case, keep the original single-page app behavior.
         main()
     except Exception as e:
         st.error("**App error** – Check server logs for full traceback.")
         st.exception(e)
-

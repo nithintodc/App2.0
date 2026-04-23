@@ -604,6 +604,12 @@ def display_file_upload_screen():
         
         if valid and dates_provided:
             st.session_state["operator_name"] = operator_name.strip() if (operator_name and str(operator_name).strip()) else ""
+            st.query_params["pre_start_date"] = st.session_state.get("pre_start_date", "")
+            st.query_params["pre_end_date"] = st.session_state.get("pre_end_date", "")
+            st.query_params["post_start_date"] = st.session_state.get("post_start_date", "")
+            st.query_params["post_end_date"] = st.session_state.get("post_end_date", "")
+            if st.session_state.get("operator_name"):
+                st.query_params["operator_name"] = st.session_state.get("operator_name", "")
             st.session_state["current_screen"] = "dashboard"
             st.rerun()
         elif not dates_provided:
