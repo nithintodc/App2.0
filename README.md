@@ -5,7 +5,7 @@ A modern Streamlit-based cloud application for analyzing DoorDash and UberEats d
 ## 🚀 Features
 
 - **Multi-Screen Interface**: Clean, SaaS-style UI with file upload and dashboard screens
-- **File Upload System**: Upload dd-data.csv, ue-data.csv, and marketing folders
+- **Batch File Intake**: Upload the four reporting CSVs together with automatic filename mapping
 - **Date Range Configuration**: Configure Pre/Post periods with automatic last-year calculations
 - **Comprehensive Analysis**: 
   - Store-level and platform-level analytics
@@ -107,12 +107,16 @@ No environment variables required for basic operation. All configuration is hand
 
 ### Step 1: Upload Files
 1. Enter Pre and Post date ranges
-2. Review suggested download range
-3. Download data from DoorDash and UberEats
-4. Upload dd-data.csv, ue-data.csv, and marketing CSV files
+2. Review the suggested download range
+3. Upload the four CSVs in one batch
+4. The app maps files automatically:
+   - `FINANCIAL*` -> DoorDash Financial
+   - `MARKETING_PROMO*` -> DoorDash Promo
+   - `MARKETING_SPONSORED*` -> DoorDash Ads
+   - Everything else -> UberEats Financial
 
 ### Step 2: Run Analysis
-1. Click "Start Analysis"
+1. Click "Run Analysis"
 2. View dashboard with comprehensive analytics
 3. Select stores to analyze
 4. Export results to Excel (automatically uploaded to Google Drive)

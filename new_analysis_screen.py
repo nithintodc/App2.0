@@ -4,8 +4,11 @@ from __future__ import annotations
 
 from pathlib import Path
 from io import BytesIO
+import math
 
+import numpy as np
 import pandas as pd
+import plotly.graph_objects as go
 import streamlit as st
 
 from config import DD_DATA_MASTER, ROOT_DIR, UE_DATA_MASTER
@@ -24,11 +27,167 @@ from new_analysis_engine import (
     spend_change_decomposition,
     summarize_metric,
 )
+from app_design import render_page_header, render_section_header, style_signed_table
 
 
 COUNT_METRICS = {"Orders"}
 PERCENT_METRICS = {"Payout Margin %"}
 RATE_METRICS = {"ROAS"}
+
+# Display order for funnel bubble view (pre vs post growth %).
+FUNNEL_METRIC_SPECS: list[tuple[str, str | None]] = [
+    ("Sales", "Sales"),
+    ("AOV", "AOV"),
+    ("Orders", "Orders"),
+    ("Payouts", "Payouts"),
+    ("Spends", "Spends"),
+    ("Commission", None),  # Sales − Payouts (platform take), growth on aggregate
+    ("Error Δ (ROAS)", "ROAS"),  # Efficiency / spend-quality proxy when spend exists
+]
+
+
+def _growth_pct_pre_post(df: pd.DataFrame, engine_metric: str | None) -> float:
+    """Post vs pre growth %; engine_metric None means Commission = Sales − Payouts."""
+    if df is None or df.empty:
+        return float("nan")
+    if engine_metric is None:
+        sales = summarize_metric(df, "Sales")
+        pay = summarize_metric(df, "Payouts")
+        pre_c = sales["Pre"] - pay["Pre"]
+        post_c = sales["Post"] - pay["Post"]
+        if abs(pre_c) < 1e-9:
+            return 0.0 if abs(post_c) < 1e-9 else float("nan")
+        return (post_c - pre_c) / abs(pre_c) * 100.0
+    return float(summarize_metric(df, engine_metric)["Growth%"])
+
+
+def build_growth_funnel_dataframe(filtered_df: pd.DataFrame) -> pd.DataFrame:
+    """Long-form rows for Combined / DoorDash / UberEats bubble chart."""
+    scopes: list[tuple[str, pd.DataFrame]] = [
+        ("Combined", filtered_df),
+        ("DoorDash", filtered_df[filtered_df["Platform"] == "DoorDash"]),
+        ("UberEats", filtered_df[filtered_df["Platform"] == "UberEats"]),
+    ]
+    rows = []
+    for scope, sdf in scopes:
+        empty = sdf is None or sdf.empty
+        for label, eng in FUNNEL_METRIC_SPECS:
+            g = _growth_pct_pre_post(sdf if not empty else pd.DataFrame(), eng)
+            rows.append(
+                {
+                    "Scope": scope,
+                    "Metric": label,
+                    "Growth %": g,
+                    "Abs growth %": abs(g) if not math.isnan(g) else 0.0,
+                    "Has data": not empty,
+                }
+            )
+    return pd.DataFrame(rows)
+
+
+def render_growth_funnel_bubbles(filtered_df: pd.DataFrame) -> None:
+    """Funnel-style bubble grid: one row per scope, bubble size = |growth %|."""
+    render_section_header(
+        "Growth funnel (pre vs post)",
+        "Bubble size scales with the magnitude of growth %; color shows direction (green up, red down).",
+    )
+    long_df = build_growth_funnel_dataframe(filtered_df)
+    if long_df.empty:
+        st.info("No data for growth funnel.")
+        return
+
+    fg = long_df["Growth %"].replace([np.inf, -np.inf], np.nan).dropna()
+    cap = float(fg.abs().max()) if not fg.empty else 1.0
+    if cap < 1e-9:
+        cap = 1.0
+
+    # Size: map |growth| into ~18–72 px radius feel (plotly size is area-ish)
+    sizes = []
+    for _, r in long_df.iterrows():
+        g = r["Growth %"]
+        if not r["Has data"] or (isinstance(g, float) and not math.isfinite(g)):
+            sizes.append(10)
+        else:
+            a = min(abs(g), cap * 1.2) / cap
+            sizes.append(18 + a * 55)
+
+    long_df = long_df.copy()
+    long_df["bubble_size"] = sizes
+    long_df["Label"] = long_df.apply(
+        lambda r: "n/a"
+        if (not r["Has data"])
+        else ("n/a" if not math.isfinite(r["Growth %"]) else f'{r["Growth %"]:+.1f}%'),
+        axis=1,
+    )
+
+    orders = [m[0] for m in FUNNEL_METRIC_SPECS]
+    fig = go.Figure()
+    for scope in ["Combined", "DoorDash", "UberEats"]:
+        sub = long_df[long_df["Scope"] == scope]
+
+        colors = []
+        for _, r in sub.iterrows():
+            if not r["Has data"]:
+                colors.append("rgba(156,163,175,0.55)")
+            elif not isinstance(r["Growth %"], (int, float)) or not math.isfinite(float(r["Growth %"])):
+                colors.append("rgba(107,114,128,0.7)")
+            elif r["Growth %"] >= 0:
+                colors.append("#16a34a")
+            else:
+                colors.append("#dc2626")
+
+        fig.add_trace(
+            go.Scatter(
+                x=sub["Metric"],
+                y=[scope] * len(sub),
+                mode="markers+text",
+                name=scope,
+                showlegend=False,
+                marker=dict(
+                    size=sub["bubble_size"],
+                    color=colors,
+                    line=dict(width=1.5, color="#1f2937"),
+                    sizemode="diameter",
+                ),
+                text=sub["Label"],
+                textposition="middle center",
+                textfont=dict(size=10, color="#0f172a"),
+                hovertemplate="%{y} · %{x}<br>Growth: %{customdata}<extra></extra>",
+                customdata=[
+                    f"{r['Growth %']:+.2f}%"
+                    if isinstance(r["Growth %"], (int, float)) and math.isfinite(float(r["Growth %"]))
+                    else "n/a"
+                    for _, r in sub.iterrows()
+                ],
+            )
+        )
+
+    fig.update_layout(
+        height=420,
+        margin=dict(l=24, r=24, t=48, b=80),
+        paper_bgcolor="#FAFAFA",
+        plot_bgcolor="#FFFFFF",
+        xaxis=dict(
+            categoryorder="array",
+            categoryarray=orders,
+            tickangle=-28,
+            title="",
+            gridcolor="#E5E7EB",
+        ),
+        yaxis=dict(
+            title="",
+            categoryorder="array",
+            categoryarray=["UberEats", "DoorDash", "Combined"],
+            autorange="reversed",
+            gridcolor="#E5E7EB",
+        ),
+    )
+    st.plotly_chart(fig, use_container_width=True)
+    st.caption(
+        "Commission = aggregate (Sales − Payouts), pre vs post. "
+        "ROAS reflects sales per marketing dollar; when spend is zero it may read as n/a. "
+        "Use ROAS as an efficiency / anomaly signal alongside your spend data."
+    )
 
 
 def resolve_source_paths() -> tuple[Path | None, Path | None, Path | None]:
@@ -124,7 +283,7 @@ def render_narrative(filtered_df: pd.DataFrame) -> None:
             f"Biggest negative store contribution: {top_decline['Store Label']} at {format_delta('Sales', top_decline['Delta'])} ({top_decline['Contribution%']:.1f}% of net sales change)."
         )
 
-    st.markdown("#### Strategic Diagnosis")
+    render_section_header("Strategic Diagnosis", "Plain-language explanation of what moved and why.")
     for bullet in bullets:
         st.write(f"- {bullet}")
 
@@ -145,7 +304,7 @@ def render_driver_table(filtered_df: pd.DataFrame, metric: str, level: str, labe
 
     chart_source = bridge.head(12).set_index(level)[["Delta"]]
     st.bar_chart(chart_source)
-    st.dataframe(display.rename(columns={level: label_column}), use_container_width=True, hide_index=True)
+    st.dataframe(style_signed_table(display.rename(columns={level: label_column})), use_container_width=True, hide_index=True)
 
 
 def build_summary_snapshot(filtered_df: pd.DataFrame) -> pd.DataFrame:
@@ -196,13 +355,13 @@ def render_drilldown(filtered_df: pd.DataFrame, metric: str) -> None:
     left, right = st.columns(2)
     with left:
         st.write("**Store drivers**")
-        st.dataframe(store_bridge.head(10), use_container_width=True, hide_index=True)
+        st.dataframe(style_signed_table(store_bridge.head(10)), use_container_width=True, hide_index=True)
     with right:
         st.write(f"**{selected_store} -> day drivers**")
-        st.dataframe(day_bridge, use_container_width=True, hide_index=True)
+        st.dataframe(style_signed_table(day_bridge), use_container_width=True, hide_index=True)
 
     st.write(f"**{selected_store} -> {selected_day} -> slot drivers**")
-    st.dataframe(slot_bridge, use_container_width=True, hide_index=True)
+    st.dataframe(style_signed_table(slot_bridge), use_container_width=True, hide_index=True)
 
 
 def render_marketing_tab(filtered_df: pd.DataFrame, campaign_df: pd.DataFrame) -> None:
@@ -218,7 +377,7 @@ def render_marketing_tab(filtered_df: pd.DataFrame, campaign_df: pd.DataFrame) -
     spend_display["ROAS"] = spend_summary["ROAS"].map(lambda value: format_metric_value("ROAS", value))
     spend_display["Payout Margin %"] = spend_summary["Payout Margin %"].map(lambda value: format_metric_value("Payout Margin %", value))
     st.write("**Spend split and efficiency**")
-    st.dataframe(spend_display, use_container_width=True, hide_index=True)
+    st.dataframe(style_signed_table(spend_display), use_container_width=True, hide_index=True)
 
     st.write("**Store-level spend contribution**")
     render_driver_table(filtered_df[filtered_df["Spends"] != 0], "Spends", "Store Label", "Store")
@@ -231,7 +390,7 @@ def render_marketing_tab(filtered_df: pd.DataFrame, campaign_df: pd.DataFrame) -
         st.caption("Campaign focus is prefilled from the Top / Bottom tab when you click `Use as focus`.")
         campaign_view = campaign_df[campaign_df["Campaign Label"] == selected_campaign][["Campaign Label", "Period", "Sales", "Spend", "Orders", "ROAS", "Cost per Order"]].copy()
         st.write("**Focused campaign detail**")
-        st.dataframe(campaign_view, use_container_width=True, hide_index=True)
+        st.dataframe(style_signed_table(campaign_view), use_container_width=True, hide_index=True)
 
 
 def render_focus_selector(
@@ -312,7 +471,7 @@ def render_percentile_table(
     display["Percentile"] = display["Percentile"].map(lambda value: f"{value:.1f}")
 
     st.write(f"**{title}**")
-    st.dataframe(display, use_container_width=True, hide_index=True)
+    st.dataframe(style_signed_table(display), use_container_width=True, hide_index=True)
 
 
 def build_gc_percentile_dataset(filtered_df: pd.DataFrame) -> pd.DataFrame:
@@ -456,7 +615,7 @@ def render_gc_bucket_analysis(filtered_df: pd.DataFrame) -> None:
 
     st.write("**Guest count / ticket bucket movement**")
     st.bar_chart(gc_table.set_index("GC Bucket")[["Delta Orders"]])
-    st.dataframe(gc_table, use_container_width=True, hide_index=True)
+    st.dataframe(style_signed_table(gc_table), use_container_width=True, hide_index=True)
 
 
 def build_download_workbook(filtered_df: pd.DataFrame) -> bytes:
@@ -521,17 +680,6 @@ def cached_dataset(dd_path_str, ue_path_str, marketing_path_str, pre_start, pre_
 
 def display_new_analysis_screen() -> None:
     """Entry point for the New deep-dive screen."""
-    st.markdown('<h1 style="margin-bottom:0.1rem;">New Analysis View</h1>', unsafe_allow_html=True)
-    st.caption("Step-by-step diagnosis of growth, decline, and root causes across store, day, and slot.")
-    st.markdown(
-        """
-        <div style="margin: 0.75rem 0 1rem;">
-            <a href="/" target="_self" style="display:inline-block;padding:0.5rem 0.9rem;border:1px solid #D6D0C8;border-radius:8px;background:#FFFFFF;color:#1E1E1E;text-decoration:none;font-weight:600;">Home</a>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
     # Bootstrap key filters from query params if the page is opened directly or refreshed.
     for key in ["pre_start_date", "pre_end_date", "post_start_date", "post_end_date", "operator_name"]:
         if not st.session_state.get(key) and key in st.query_params:
@@ -549,6 +697,24 @@ def display_new_analysis_screen() -> None:
     post_start = st.session_state.get("post_start_date", "")
     post_end = st.session_state.get("post_end_date", "")
     excluded_dates = tuple(str(value) for value in st.session_state.get("excluded_dates", []))
+
+    render_page_header(
+        "Diagnostic Workspace",
+        "Root-Cause Analysis",
+        "Step-by-step diagnosis of growth, decline, and drivers across store, day, slot, and campaign.",
+        meta_items=[
+            (f"Pre {pre_start or 'not set'} - {pre_end or 'not set'}", "info"),
+            (f"Post {post_start or 'not set'} - {post_end or 'not set'}", "info"),
+        ],
+    )
+    st.markdown(
+        """
+        <div style="margin: -0.35rem 0 1rem;">
+            <a href="/" target="_self" style="display:inline-block;padding:0.5rem 0.9rem;border:1px solid #D0D5DD;border-radius:8px;background:#FFFFFF;color:#344054;text-decoration:none;font-weight:650;">Back to dashboard</a>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
     if not all([pre_start, pre_end, post_start, post_end]):
         st.warning("Set pre and post date ranges on the Setup & Upload screen before using the New view.")
@@ -597,7 +763,9 @@ def display_new_analysis_screen() -> None:
         st.info("No rows remain after filtering.")
         return
 
+    render_section_header("Diagnostic Summary", "Top-line movement for the filtered workspace.")
     render_summary_cards(filtered_df)
+    render_growth_funnel_bubbles(filtered_df)
     render_narrative(filtered_df)
 
     st.download_button(
@@ -621,7 +789,7 @@ def display_new_analysis_screen() -> None:
         summary_snapshot = build_summary_snapshot(filtered_df)
         if not summary_snapshot.empty:
             st.write("**What changed / where it came from**")
-            st.dataframe(summary_snapshot, use_container_width=True, hide_index=True)
+            st.dataframe(style_signed_table(summary_snapshot), use_container_width=True, hide_index=True)
 
     with tabs[1]:
         metric = st.selectbox("Metric", PRIMARY_METRICS, index=0, key="new_view_metric")
@@ -653,7 +821,7 @@ def display_new_analysis_screen() -> None:
             st.info("No major contradictory signals were detected in the current filter set.")
         else:
             st.write("**Priority exceptions to investigate**")
-            st.dataframe(exceptions_table, use_container_width=True, hide_index=True)
+            st.dataframe(style_signed_table(exceptions_table), use_container_width=True, hide_index=True)
 
     with tabs[7]:
         render_data_notes()

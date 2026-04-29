@@ -6,6 +6,9 @@ maxUploadSize = 1024
 [client]
 showSidebarNavigation = false
 
+[runner]
+magicEnabled = false
+
 [theme]
 # TODC brand theme – warm orange accent, clean white background
 base = "light"

@@ -2,6 +2,7 @@
 import pandas as pd
 import streamlit as st
 from table_generation import create_summary_tables
+from app_design import style_signed_table
 
 
 def create_store_selector(platform_name, df, platform_key, file_uploaded=False, date_ranges_set=False):
@@ -14,28 +15,28 @@ def create_store_selector(platform_name, df, platform_key, file_uploaded=False, 
         file_uploaded: Whether the file has been uploaded (default: False)
         date_ranges_set: Whether date ranges have been set (default: False)
     """
-    with st.expander(f"🔍 {platform_name} Store Selection", expanded=True):
+    with st.expander(f"{platform_name} Store Selection", expanded=True):
         # Check if dataframe is empty
         if df.empty:
             if file_uploaded and not date_ranges_set:
-                st.warning(f"⚠️ {platform_name} file uploaded. Please set Pre and Post date ranges in the sidebar to load stores.")
+                st.warning(f"{platform_name} file uploaded. Please set Pre and Post date ranges in the sidebar to load stores.")
             elif file_uploaded and date_ranges_set:
-                st.warning(f"⚠️ {platform_name} file uploaded, but no data found for the selected date ranges. Please check your date ranges and try again.")
+                st.warning(f"{platform_name} file uploaded, but no data found for the selected date ranges. Please check your date ranges and try again.")
             else:
-                st.warning(f"⚠️ No {platform_name} data available. Please upload the {platform_name} file and set Pre and Post date ranges in the sidebar.")
+                st.warning(f"No {platform_name} data available. Please upload the {platform_name} file and set Pre and Post date ranges in the sidebar.")
             st.info(f"**0** stores selected out of **0** total")
             return
         
         # Get all unique store IDs
         if 'Store ID' not in df.columns:
-            st.error(f"⚠️ 'Store ID' column not found in {platform_name} data.")
+            st.error(f"'Store ID' column not found in {platform_name} data.")
             st.info(f"**0** stores selected out of **0** total")
             return
             
         all_stores = sorted(df['Store ID'].unique().tolist())
         
         if not all_stores:
-            st.warning(f"⚠️ No stores found in {platform_name} data. Please check your date ranges and data files.")
+            st.warning(f"No stores found in {platform_name} data. Please check your date ranges and data files.")
             st.info(f"**0** stores selected out of **0** total")
             return
         
@@ -59,7 +60,7 @@ def create_store_selector(platform_name, df, platform_key, file_uploaded=False, 
                 st.session_state[platform_key] = all_stores.copy()
                 st.rerun()
         with col2:
-            if st.button("Deselect All", key=f"deselect_all_{platform_name}"):
+            if st.button("Clear", key=f"deselect_all_{platform_name}"):
                 st.session_state[platform_key] = []
                 st.rerun()
         
@@ -109,7 +110,7 @@ def display_store_tables(platform_name, table1_df, table2_df):
                 table1_display = table1_display.drop(columns=['LastYear Pre vs Post'])
             table1_display['Growth%'] = table1_display['Growth%'].apply(lambda x: f"{x:.1f}%")
             table1_display = table1_display.set_index('Store ID')
-            st.dataframe(table1_display, use_container_width=True, height=290)
+            st.dataframe(style_signed_table(table1_display), use_container_width=True, height=290)
         else:
             st.info("No data available for Table 1")
 
@@ -139,7 +140,7 @@ def display_store_tables(platform_name, table1_df, table2_df):
                     table2_display['YoY%'] = table2_display['YoY%'].apply(lambda x: f"{x:.1f}%")
                 if 'Store ID' in table2_display.columns:
                     table2_display = table2_display.set_index('Store ID')
-                st.dataframe(table2_display, use_container_width=True, height=290)
+                st.dataframe(style_signed_table(table2_display), use_container_width=True, height=290)
             else:
                 st.info("No data available for Table 2")
         else:
@@ -212,10 +213,10 @@ def display_summary_tables(platform_name, summary_table1, summary_table2):
 
     with col_left:
         st.write(f"**{platform_name} Table 1: Current Year Pre vs Post Analysis**")
-        st.dataframe(summary_table1_display, use_container_width=True)
+        st.dataframe(style_signed_table(summary_table1_display), use_container_width=True)
     with col_right:
         st.write(f"**{platform_name} Table 2: Year-over-Year Analysis**")
-        st.dataframe(summary_table2_display, use_container_width=True)
+        st.dataframe(style_signed_table(summary_table2_display), use_container_width=True)
 
 
 def display_platform_data(platform_name, sales_df, payouts_df, sales_label, platform_key):
@@ -232,11 +233,11 @@ def display_platform_data(platform_name, sales_df, payouts_df, sales_label, plat
         return None, None
     
     # Display the analysis tables
-    st.header(f"📈 {platform_name} Performance Analysis")
-    st.caption(f"💡 All values represent aggregated sums of **{sales_label}** by Store ID")
+    st.header(f"{platform_name} Performance Analysis")
+    st.caption(f"All values represent aggregated sums of **{sales_label}** by Store ID")
     
     # Summary Tables (above store-level)
-    st.subheader("📊 Summary Tables (Aggregated Across Selected Stores)")
+    st.subheader("Summary Tables (Aggregated Across Selected Stores)")
     summary_table1, summary_table2 = create_summary_tables(sales_df, payouts_df, selected_stores)
     
     # Format and display Summary Table 1
@@ -248,7 +249,7 @@ def display_platform_data(platform_name, sales_df, payouts_df, sales_label, plat
     summary_table1_display['Growth%'] = summary_table1_display['Growth%'].apply(lambda x: f"{x:.1f}%")
     
     st.write("**Table 1: Current Year Pre vs Post Analysis**")
-    st.dataframe(summary_table1_display, width='stretch')
+    st.dataframe(style_signed_table(summary_table1_display), width='stretch')
     
     # Format and display Summary Table 2
     summary_table2_display = summary_table2.copy()
@@ -258,10 +259,10 @@ def display_platform_data(platform_name, sales_df, payouts_df, sales_label, plat
     summary_table2_display['YoY%'] = summary_table2_display['YoY%'].apply(lambda x: f"{x:.1f}%")
     
     st.write("**Table 2: Year-over-Year Analysis**")
-    st.dataframe(summary_table2_display, width='stretch')
+    st.dataframe(style_signed_table(summary_table2_display), width='stretch')
     
     st.divider()
-    st.subheader("🏪 Store-Level Analysis")
+    st.subheader("Store-Level Analysis")
     
     # First Table: Store ID, Pre, Post, PrevsPost, LastYear Pre vs Post, Growth%
     st.subheader("Table 1: Current Year Pre vs Post Analysis")
@@ -285,7 +286,7 @@ def display_platform_data(platform_name, sales_df, payouts_df, sales_label, plat
     table1_display['Growth%'] = table1_display['Growth%'].apply(lambda x: f"{x:.1f}%")
     table1_display = table1_display.set_index('Store ID')
     st.dataframe(
-        table1_display,
+        style_signed_table(table1_display),
         width='stretch',
         height=400
     )
@@ -310,7 +311,7 @@ def display_platform_data(platform_name, sales_df, payouts_df, sales_label, plat
     table2_display['YoY%'] = table2_display['YoY%'].apply(lambda x: f"{x:.1f}%")
     table2_display = table2_display.set_index('Store ID')
     st.dataframe(
-        table2_display,
+        style_signed_table(table2_display),
         width='stretch',
         height=400
     )

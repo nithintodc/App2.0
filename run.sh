@@ -1,7 +1,9 @@
 #!/bin/bash
 # Run Python App with Virtual Environment
-if [ ! -d "venv" ]; then
+# Recreate venv if missing or broken (e.g. Homebrew Python was upgraded/removed)
+if [ ! -d "venv" ] || [ ! -e "venv/bin/python" ] || ! venv/bin/python -c "import sys" 2>/dev/null; then
   echo "Creating virtual environment..."
+  rm -rf venv
   python3 -m venv venv
 fi
 source venv/bin/activate
